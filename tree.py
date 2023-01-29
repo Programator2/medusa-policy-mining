@@ -108,16 +108,16 @@ class NpmTree(Tree):
         # TODO: Also de-duplicate after normalizing comm
         for d in log:
             node = self._create_path_with_permission(
-                d.Path.removesuffix(' (deleted)')
+                d.path.removesuffix(' (deleted)')
             )
 
-            perm = Permission(int(d.Permission))
+            perm = Permission(int(d.permission))
 
             if node.data == None:
                 node.data = NpmNode()
             access = Access(perm)
-            access.uid = int(d.Uid)
-            access.comm = normalize_comm(d.Proctitle)
+            access.uid = int(d.uid)
+            access.comm = normalize_comm(d.proctitle)
 
             node.data.add_item(access)
 
