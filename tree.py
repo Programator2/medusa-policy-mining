@@ -55,13 +55,10 @@ class NpmNode(set):
     """Represents internal data of the node (especially permissions)."""
 
     def __init__(self, *args):
-        self.generalized : set[Access] = set() # Contains set of Access objects
-                                               # that were generalized (globbed)
-                                               # for this node. This access
-                                               # should be used for node/* rule.
-                                               # This set should contain just
-                                               # one object, but I'm keeping it
-                                               # as a set just in case.
+        # Contains set of `Access` objects that were generalized (globbed) for
+        # this node. This access should be used for node/* rule. This set should
+        # contain just one object, but I'm keeping it as a set just in case.
+        self.generalized : set[Access] = set()
         super().__init__(self, *args)
 
     def add_item(self, access: Access):
