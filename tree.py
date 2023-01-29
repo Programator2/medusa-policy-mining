@@ -1,5 +1,4 @@
 from treelib import Tree
-from enum import IntFlag, _power_of_two
 from treelib.exceptions import NodeIDAbsentError
 from treelib.node import Node
 from typing import Callable
@@ -7,26 +6,7 @@ from collections import UserList
 from pprint import pprint
 from collections.abc import Iterable
 from more_itertools import first
-
-
-# https://stackoverflow.com/a/66465125/4739767
-class BetterIntFlag(IntFlag):
-    def __repr__(self):
-        if self.value == 0:
-            return "%s(0)" % self.__class__.__name__
-        return '|'.join(
-            m.name
-            for m in self.__class__
-            if m.value & self.value and _power_of_two(m.value)
-        )
-
-    __str__ = __repr__
-
-
-class Permission(BetterIntFlag):
-    READ = 1
-    WRITE = 2
-    SEE = 4
+from permission import Permission
 
 
 class Access:
