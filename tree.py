@@ -2,7 +2,7 @@ from treelib import Tree
 from treelib.exceptions import NodeIDAbsentError
 from treelib.node import Node
 from typing import Callable
-from collections import UserList
+from collections import UserList, Counter
 from pprint import pprint
 from collections.abc import Iterable
 from more_itertools import first
@@ -156,6 +156,7 @@ class NpmTree(Tree):
         return path
 
     def generalize(self, node: Node):
+        """Do a recursive depth-first search and on the way up """
         if not (children := node.successors(self.identifier)):
             return
         for n in children:
@@ -165,13 +166,34 @@ class NpmTree(Tree):
         access_sets = filter(
             lambda x: x is not None, (self.get_node(n).data for n in children)
         )
-        access_set = set().union(*access_sets)
-        if len(access_set) == 1:
-            # This means that all child items have the same accesses
-            if node.data == None:
-                node.data = NpmNode()
-            node.data.generalized.add(ac := first(access_set))
-            print(f'Generalized {ac} for {self.get_path(node)}')
+        # access_sets_list = list(access_sets)
+        # breakpoint()
+        # number_of_items = len(access_sets_list)
+        c = Counter()
+        items_count = 0
+        for access in access_sets:
+            items_count += 1
+            for perm in access:
+                c[perm] += 1
+        # access_set = set().union(*access_sets)
+        # TODO: If you want to include threshold parameter, you need to compute
+        # the ratio here
+        for perm, number in c.items():
+            # This just checks for the complete number of items not considering
+            # the type (directory/file)
+            if number == items_count:
+                # This means that all child items have the same accesses
+                if node.data == None:
+                    node.data = NpmNode()
+                node.data.generalized.add(ac := perm)
+                print(f'Generalized {ac} for {self.get_path(node)}')
+
+        # if len(access_set) == 1:
+        #     # This means that all child items have the same accesses
+        #     if node.data == None:
+        #         node.data = NpmNode()
+        #     node.data.generalized.add(ac := first(access_set))
+        #     print(f'Generalized {ac} for {self.get_path(node)}')
         # print('Access set ma', len(access_set), 'poloziek')
 
     def show(
