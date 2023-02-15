@@ -5,6 +5,8 @@ from collections import defaultdict, namedtuple
 from itertools import takewhile, groupby
 from permission import Permission
 from pprint import pprint
+from treelib import Tree
+from tree import DomainTree
 
 
 PathAccess = namedtuple('PathAccess', ['path', 'permissions'])
@@ -73,7 +75,7 @@ def initialize_domain(message: dict, messages: list, domains: defaultdict):
             return domains[pid]
 
 
-def assign_permissions(entries: list[dict]) -> list[AuditLogRaw]:
+def assign_permissions(entries: list[dict], domain_tree: DomainTree) -> list[AuditLogRaw]:
     """Assign permissions based on operation type and create a new list of
     accesses with compressed information (leave out everything that's not
     needed).
@@ -151,6 +153,8 @@ def assign_permissions(entries: list[dict]) -> list[AuditLogRaw]:
                     # entry, so this should be replaced by `search_field`
                     initialize_domain(m, messages, domains)
                     domains[m['pid']] += (m['filename'],)
+                    # A new domain has been created, add it to the tree
+                    domain_tree._create_path(domains[m['pid']])
                 case 'open':
                     access = (
                         PathAccess(
@@ -308,15 +312,15 @@ def parse(path: str) -> list[dict]:
     return entries
 
 
-def parse_log(path: str) -> list[AuditEntry]:
+def parse_log(path: str, domain_tree: Tree) -> list[AuditEntry]:
+    """Parse the log, process AVC entries and create domain transfer
+    tree.
+
+    :param path: path to the audit.log log
+    :param domain_tree: `Tree` object that will be used to create
+    domain transfer tree
+    """
     serials = parse(path)
-    out = assign_permissions(serials)
+    out = assign_permissions(serials, domain_tree)
     out = create_log_entries(out)
     return out
-
-
-if __name__ == '__main__':
-    serials = parse('2023-01-26-sshd.log')
-    out = assign_permissions(serials)
-    out = create_log_entries(out)
-    pprint(out)

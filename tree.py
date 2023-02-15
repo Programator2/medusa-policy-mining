@@ -184,7 +184,8 @@ class NpmTree(GenericTree):
         return path
 
     def generalize(self, node: Node):
-        """Do a recursive depth-first search and on the way up """
+        """Do a recursive depth-first search and on the way up TODO:
+        finish"""
         if not (children := node.successors(self.identifier)):
             return
         for n in children:
