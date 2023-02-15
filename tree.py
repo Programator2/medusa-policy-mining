@@ -1,3 +1,4 @@
+"""Tree data structure for the Medusa Policy Miner"""
 from treelib import Tree
 from treelib.exceptions import NodeIDAbsentError
 from treelib.node import Node
@@ -60,19 +61,15 @@ class NpmNode(set):
         self.add(access)
 
 
-class NpmTree(Tree):
+class GenericTree(Tree):
     def __init__(self, *args, **kwargs):
         super().__init__(self, args, kwargs)
-        self.npm_root = self.create_node('/', '/')
-        self.root = self.npm_root.identifier
 
-    def _create_path(self, path: str):
+    def _create_path(self, entries: Iterable):
         """Create necessary nodes in the tree to represent a path.
 
-        :param path: string in the form of `/this/is/a/path`. It has to start
-        with a `/` and optionally end with a `/`
+        :param path: tuple of strings representing names of nodes in the path
         """
-        entries = filter(lambda x: bool(x), path.split('/'))
         parent = self.npm_root
         for e in entries:
             exists = next(
@@ -87,6 +84,37 @@ class NpmTree(Tree):
             else:
                 parent = self.create_node(e, parent=parent.identifier)
         return parent
+
+
+class DomainTree(GenericTree):
+    def __init__(self, *args, **kwargs):
+        super().__init__(self, args, kwargs)
+        self.npm_root = self.create_node('/', '/')
+        self.root = self.npm_root.identifier
+
+    def _create_path(self, path: tuple[str]):
+        """Create necessary nodes in the tree to represent an execution path.
+
+        :param path: tuple of strings representing paths of executables
+        executed in a thread
+        """
+        return GenericTree._create_path(self, path)
+
+
+class NpmTree(GenericTree):
+    def __init__(self, *args, **kwargs):
+        super().__init__(self, args, kwargs)
+        self.npm_root = self.create_node('/', '/')
+        self.root = self.npm_root.identifier
+
+    def _create_path(self, path: str):
+        """Create necessary nodes in the tree to represent a path.
+
+        :param path: string in the form of `/this/is/a/path`. It has to start
+        with a `/` and optionally end with a `/`
+        """
+        entries = filter(lambda x: bool(x), path.split('/'))
+        return GenericTree._create_path(self, entries)
 
     def _create_path_with_permission(self, path: str):
         node = self._create_path(path)
@@ -196,6 +224,8 @@ class NpmTree(Tree):
         #     print(f'Generalized {ac} for {self.get_path(node)}')
         # print('Access set ma', len(access_set), 'poloziek')
 
+    # TODO: override this function without copying so much stuff from the
+    # library
     def show(
         self,
         nid=None,
