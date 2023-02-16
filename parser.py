@@ -1,42 +1,13 @@
 """ Parser for audit.log format """
 
 
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 from itertools import takewhile, groupby
 from permission import Permission
 from pprint import pprint
 from treelib import Tree
 from tree import DomainTree
-
-
-PathAccess = namedtuple('PathAccess', ['path', 'permissions'])
-AuditLogRaw = namedtuple(
-    'AuditLogRaw',
-    [
-        'serial',
-        'proctitle',
-        'mode',
-        'uid',
-        'pid',
-        'ppid',
-        'path',
-        'syscall',
-        'operation',
-        'domain',
-    ],
-)
-AuditEntry = namedtuple(
-    'AuditEntry',
-    [
-        'proctitle',
-        'path',
-        'permission',
-        'uid',
-        'pid',
-        'ppid',
-        'operation',
-    ],
-)
+from mpm_types import PathAccess, AuditLogRaw, AuditEntry
 
 
 def search_field(l: list[dict], key: str):

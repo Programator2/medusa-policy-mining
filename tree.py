@@ -8,6 +8,7 @@ from pprint import pprint
 from collections.abc import Iterable
 from more_itertools import first
 from permission import Permission
+from mpm_types import AuditEntry
 
 
 class Access:
@@ -130,6 +131,7 @@ class NpmTree(GenericTree):
                     return c
             return comm
 
+    def load_log(self, log: Iterable[AuditEntry]):
         # TODO: Also normalize accesses. If someone requests write, it should
         # get the highest priority.
 
