@@ -14,6 +14,13 @@ class BetterIntFlag(IntFlag):
 
     __str__ = __repr__
 
+    def short_repr(self) -> str:
+        return ''.join(
+            m.name[0]
+            for m in self.__class__
+            if m.value & self.value and _power_of_two(m.value)
+        )
+
 
 class Permission(BetterIntFlag):
     READ = 1

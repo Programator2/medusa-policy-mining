@@ -1,6 +1,16 @@
 from tree import NpmTree, Access, Permission
 from collections import UserDict, defaultdict
 from itertools import count
+from pprint import pprint
+
+STANDARD_TREES = """tree "fs" clone of file by getfile getfile.filename;
+primary tree "fs";
+tree "domain" of process;
+"""
+
+STANDARD_SPACES = """space all_domains = recursive "domain";
+space all_files = recursive "/";
+"""
 
 
 class Domain(UserDict):
@@ -23,7 +33,7 @@ def make_unique(name: str, s: dict) -> str:
 
 def get_access_name(access: Access) -> str:
     """Create a descriptive name for access."""
-    return f'{access.comm.replace(" ", "")}{access.uid}_{access.permissions}'
+    return f'{access.comm.replace(" ", "")}{access.uid}_{access.permissions.short_repr()}'
 
 
 def get_uniq_acess_name(access: Access, s: dict) -> str:
@@ -38,7 +48,6 @@ def create_constable_policy(t: NpmTree) -> str:
         if n.data is None:
             continue
         path = t.get_path(n)
-        # if n,pare
         for access in n.data:
             spaces[access].append(path)
         # TODO: direct child nodes of generalized nodes should not be included
@@ -47,7 +56,9 @@ def create_constable_policy(t: NpmTree) -> str:
             for access in n.data.generalized:
                 spaces[access].append(path + '/*')
 
-    config = ''
+    config = STANDARD_TREES + STANDARD_SPACES
+
+    pprint(spaces)
 
     # Assign paths to virtual spaces
     spaces_names: dict[str, Access] = {}  # name to Access
@@ -74,7 +85,7 @@ def create_constable_policy(t: NpmTree) -> str:
         domain_name = f'{comm.replace(" ", "")}{uid}'
         config += f'space {domain_name} = "domain/{domain_name}";\n'
         config += f'{domain_name}    '
-        ending_comma = ''       # On the first row we don't need a comma
+        ending_comma = ''  # On the first row we don't need a comma
         for i, permission in enumerate(Permission):
             if not (permission_list := domain[permission]):
                 continue
