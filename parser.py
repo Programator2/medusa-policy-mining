@@ -19,6 +19,12 @@ def search_field(l: list[dict], key: str):
 
 
 def create_log_entries(l: list[AuditLogRaw]) -> list[AuditEntry]:
+    """Filter and compress audit entries in the form of `AuditLogRaw` tuples
+    into `AuditEntry` tuples
+
+    This is a great place to do final processing of the entries before the data
+    is sent to the mining module.
+    """
     entries = []
     for a in l:
         for permission in a.path:
@@ -30,6 +36,7 @@ def create_log_entries(l: list[AuditLogRaw]) -> list[AuditEntry]:
                 pid=a.pid,
                 ppid=a.ppid,
                 operation=a.operation,
+                domain=a.domain,
             )
             entries.append(entry)
     return entries

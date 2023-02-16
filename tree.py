@@ -9,6 +9,7 @@ from collections.abc import Iterable
 from more_itertools import first
 from permission import Permission
 from mpm_types import AuditEntry
+import sys
 
 
 class Access:
@@ -16,21 +17,55 @@ class Access:
 
     def __init__(self, permissions: Permission):
         self.permissions = permissions
-        self.uid = None
-        self.comm = None
+        self._uid = None
+        # comm is being deprecated as it doesn't accurate represent the current
+        # domain of the process (it may be changed by the running process and
+        # Medusa doesn't keep it updated one set in the kobject)
+        self._comm = None
+        self._domain = None
+
+    @property
+    def uid(self):
+        return self._uid
+
+    @uid.setter
+    def uid(self, uid):
+        if self._uid is not None:
+            raise Exception("attribute can't be modified")
+        self._uid = uid
+
+    @property
+    def comm(self):
+        return self._comm
+
+    @comm.setter
+    def comm(self, comm):
+        if self._comm is not None:
+            raise Exception("attribute can't be modified")
+        self._comm = comm
+
+    @property
+    def domain(self):
+        return self._domain
+
+    @domain.setter
+    def domain(self, domain):
+        if self._domain is not None:
+            raise Exception("attribute can't be modified")
+        self._domain = domain
 
     def __repr__(self):
-        return f'<{self.comm} ({self.uid}): {self.permissions}>'
+        return f'<{self.domain} {self.comm} ({self.uid}): {self.permissions}>'
 
     def __eq__(self, other):
         return (
             self.permissions == other.permissions
             and self.uid == other.uid
-            and self.comm == other.comm
+            and self.domain == other.domain
         )
 
     def __hash__(self):
-        return hash((self.permissions, self.uid, self.comm))
+        return hash((self.permissions, self.uid, self.domain))
 
 
 class NpmNode(set):
@@ -40,22 +75,36 @@ class NpmNode(set):
         # Contains set of `Access` objects that were generalized (globbed) for
         # this node. This access should be used for node/* rule. This set should
         # contain just one object, but I'm keeping it as a set just in case.
-        self.generalized : set[Access] = set()
+        self.generalized: set[Access] = set()
         super().__init__(self, *args)
 
     def add_item(self, access: Access):
-        """Add access to this list, if it doesn't already exist. If there is an
-        access with the same uid and comm but different permissions, adjust
-        permissions of the existing access accordingly. This can only add
-        permissions, not remove them.
+        """Add `access` to `self`, if it isn't already present in the set. If
+        there is an access with the same uid and domain but different
+        permissions, adjust permissions of the existing access accordingly. This
+        can only add permissions, not remove them.
 
-        For example, if there is an access for reading lready in the list and
-        add is called with another access with the same uid and comm, but with
-        write permission, the new permissions will be set to read and write.
+        For example, if there is an access READ already in the list and
+        `add_item` is called with another access with the same uid and domain,
+        but with WRITE permission, the new permissions will be set to
+        `READ|WRITE`.
         """
         for a in self:
-            if access.uid == a.uid and access.comm == a.comm:
-                self.remove(a)
+            if (
+                access.uid == a.uid
+                and access.domain == a.domain
+            ):
+                try:
+                    self.remove(a)
+                except KeyError:
+                    print("Pridavany:")
+                    pprint(access)
+                    print("Porovnavany:")
+                    pprint(a)
+                    print("Obsah:")
+                    pprint(self)
+                    sys.exit(-1)
+                # print('Adding permissions for', a)
                 a.permissions = access.permissions | a.permissions
                 self.add(a)
                 return
@@ -117,27 +166,13 @@ class NpmTree(GenericTree):
         entries = filter(lambda x: bool(x), path.split('/'))
         return GenericTree._create_path(self, entries)
 
-    def _create_path_with_permission(self, path: str):
-        node = self._create_path(path)
-        return node
-
-    def load_log(self, log: Iterable):
-        def normalize_comm(comm: str) -> str:
-            """Return a normalized version of the comm name. E.g. `(mariadbd)`
-            will become `mariadb`"""
-            comms = ('sshd', 'mariadbd')
-            for c in comms:
-                if c in comm:
-                    return c
-            return comm
-
     def load_log(self, log: Iterable[AuditEntry]):
         # TODO: Also normalize accesses. If someone requests write, it should
         # get the highest priority.
 
-        # TODO: Also de-duplicate after normalizing comm
         for d in log:
-            node = self._create_path_with_permission(
+            # Create path in the tree
+            node = self._create_path(
                 d.path.removesuffix(' (deleted)')
             )
 
@@ -145,9 +180,11 @@ class NpmTree(GenericTree):
 
             if node.data == None:
                 node.data = NpmNode()
+
             access = Access(perm)
             access.uid = int(d.uid)
-            access.comm = normalize_comm(d.proctitle)
+            access.comm = d.proctitle
+            access.domain = d.domain
 
             node.data.add_item(access)
 
@@ -174,7 +211,7 @@ class NpmTree(GenericTree):
             else:
                 print(f'Path {path} does not exist.')
                 return
-        pprint(parent.data)
+            pprint(parent.data)
 
     def get_path(self, node: Node) -> str:
         """Print full path for a given node"""
@@ -270,7 +307,14 @@ class NpmTree(GenericTree):
 
         def print_callback(node):
             return (
-                '[' + ', '.join(str(i) for i in node.data) + ']' + (f' glob:{node.data.generalized}' if node.data.generalized else '')
+                '['
+                + ', '.join(str(i) for i in node.data)
+                + ']'
+                + (
+                    f' glob:{node.data.generalized}'
+                    if node.data.generalized
+                    else ''
+                )
                 if node.data is not None
                 else ""
             )
