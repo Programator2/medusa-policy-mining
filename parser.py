@@ -8,14 +8,25 @@ from pprint import pprint
 from treelib import Tree
 from tree import DomainTree
 from mpm_types import PathAccess, AuditLogRaw, AuditEntry
+from typing import DefaultDict, TypeVar, Any
 
 
-def search_field(l: list[dict], key: str):
-    """Given a list of dictionaries search for a given key. The first matching
-    value is returned."""
+def search_field(l: list[dict], key: str, _type: str = None) -> str | None:
+    """Given a list of dictionaries `l`, search for a given `key`. The first
+    matching value is returned.
+
+    :param _type: If this parameter is given, search is only executed in
+    dictionaries that contain key "type" with value equal to `_type`.
+    """
     for msg in l:
+        if _type is not None:
+            if (type_val := msg.get('type')) is None:
+                continue
+            if type_val != _type:
+                continue
         if key in msg:
             return msg[key]
+    return None
 
 
 def create_log_entries(l: list[AuditLogRaw]) -> list[AuditEntry]:
@@ -42,18 +53,28 @@ def create_log_entries(l: list[AuditLogRaw]) -> list[AuditEntry]:
     return entries
 
 
-def initialize_domain(message: dict, messages: list, domains: defaultdict):
-    """If current process (message['pid']) doesn't have a domain, try to get it
-    from the parent. If it's not available, do nothing.
+def initialize_exec_history(
+    message: dict,
+    messages: list,
+    exec_histories: DefaultDict[int, tuple[str, ...]],
+):
+    """If current process (message['pid']) doesn't have execution history, try
+    to get it from the parent. If it's not available, do nothing.
 
-    :returns: domain tuple, if found"""
-    if (pid := message['pid']) not in domains:
-        if (ppid := search_field(messages, 'ppid')) in domains:
-            domains[pid] = domains[ppid]
-            return domains[pid]
+    :returns: execution history tuple, if found. This tuple contains strings of
+    binaries executed by a thread.
+    """
+    if (pid := message['pid']) not in exec_histories:
+        if (ppid := search_field(messages, 'ppid')) in exec_histories:
+            exec_histories[pid] = exec_histories[ppid]
+            return exec_histories[pid]
 
 
-def assign_permissions(entries: list[dict], domain_tree: DomainTree) -> list[AuditLogRaw]:
+def assign_permissions(
+    entries: list[dict],
+    exec_history_tree: DomainTree,
+    domain_transition: dict[tuple[tuple, str, Any], tuple],
+) -> list[AuditLogRaw]:
     """Assign permissions based on operation type and create a new list of
     accesses with compressed information (leave out everything that's not
     needed).
@@ -61,7 +82,9 @@ def assign_permissions(entries: list[dict], domain_tree: DomainTree) -> list[Aud
     :param serials: dictionary that contains integer serial values as keys and
     list of dictionaries as values. Every inner dictionary represents one line
     of audit (one message).
-
+    :param domain_transition: Dictionary that maps transitions from one domain
+    to another. Domain can be defined by multiple data points according to the
+    needs of the mining algorithm, so no specific type of domain is defined.
     """
     # TODO: Isn't this already sorted?
     # Sort it just to be sure, it should be the best case anyway.
@@ -72,7 +95,7 @@ def assign_permissions(entries: list[dict], domain_tree: DomainTree) -> list[Aud
     # Assign pid to a domain. Changes as log entries are iterated. Domain is
     # a tuple containing filenames of executed binaries. In the future this
     # might also contain UID at the time of exec.
-    domains = defaultdict(tuple)
+    exec_histories: DefaultDict[int, tuple[str, ...]] = defaultdict(tuple)
 
     for key, msg_iter in serials:
         messages = list(msg_iter)
@@ -129,10 +152,25 @@ def assign_permissions(entries: list[dict], domain_tree: DomainTree) -> list[Aud
                     access = (PathAccess(m['filename'], Permission.READ),)
                     # TODO: Some time in the future we will remove pid from AVC
                     # entry, so this should be replaced by `search_field`
-                    initialize_domain(m, messages, domains)
-                    domains[m['pid']] += (m['filename'],)
+                    initialize_exec_history(m, messages, exec_histories)
+                    old_exec_history = exec_histories[m['pid']]
+                    exec_histories[m['pid']] += (m['filename'],)
                     # A new domain has been created, add it to the tree
-                    domain_tree._create_path(domains[m['pid']])
+                    exec_history_tree._create_path(exec_histories[m['pid']])
+
+                    domain_transition[
+                        (
+                            (
+                                old_exec_history,
+                                int(search_field(messages, 'euid', 'SYSCALL')),
+                            ),
+                            'exec',
+                            m['filename'],
+                        )
+                    ] = (
+                        exec_histories[m['pid']],
+                        int(search_field(messages, 'euid', 'SYSCALL')),
+                    )
                 case 'open':
                     access = (
                         PathAccess(
@@ -143,9 +181,27 @@ def assign_permissions(entries: list[dict], domain_tree: DomainTree) -> list[Aud
                             ),
                         ),
                     )
+                case 'setresuid':
+                    # This is not an access to an object, but a change of
+                    # subject context (the process may be running under a
+                    # different principal, and thus a different rules may
+                    # apply). We consider changes to euid as domain transfers.
+                    domain_transition[
+                        (
+                            (
+                                exec_histories[m['pid']],
+                                int(m['old_euid']),
+                            ),
+                            'setresuid',
+                            int(m['euid']),
+                        )
+                    ] = (
+                        exec_histories[m['pid']],
+                        int(m['euid']),
+                    )
 
             # Determine domain:
-            initialize_domain(m, messages, domains)
+            initialize_exec_history(m, messages, exec_histories)
 
             # We know that some of these field are straight in the AVC message.
             # Others have to be found in other messages with the same serial
@@ -160,7 +216,7 @@ def assign_permissions(entries: list[dict], domain_tree: DomainTree) -> list[Aud
                 path=access,
                 syscall=search_field(messages, 'syscall'),
                 operation=m['op'],
-                domain=domains[m['pid']]
+                domain=exec_histories[m['pid']],
             )
             # pprint(log)
 
@@ -290,7 +346,11 @@ def parse(path: str) -> list[dict]:
     return entries
 
 
-def parse_log(path: str, domain_tree: Tree) -> list[AuditEntry]:
+def parse_log(
+    path: str,
+    domain_tree: Tree,
+    domain_transition: dict[tuple[tuple, str, Any], tuple],
+) -> list[AuditEntry]:
     """Parse the log, process AVC entries and create domain transfer
     tree.
 
@@ -299,6 +359,6 @@ def parse_log(path: str, domain_tree: Tree) -> list[AuditEntry]:
     domain transfer tree
     """
     serials = parse(path)
-    out = assign_permissions(serials, domain_tree)
+    out = assign_permissions(serials, domain_tree, domain_transition)
     out = create_log_entries(out)
     return out

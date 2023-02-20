@@ -2,6 +2,7 @@ from tree import NpmTree, Access, Permission
 from collections import UserDict, defaultdict
 from itertools import count
 from pprint import pprint
+from typing import DefaultDict, Any
 
 STANDARD_TREES = """tree "fs" clone of file by getfile getfile.filename;
 primary tree "fs";
@@ -9,7 +10,33 @@ tree "domain" of process;
 """
 
 STANDARD_SPACES = """space all_domains = recursive "domain";
+primary space init = "domain/init";
 space all_files = recursive "/";
+"""
+
+GETPROCESS = """* getprocess * {
+  enter(process, @"domain/init");
+  return ALLOW;
+}
+"""
+
+
+def fexec_handler(subject: str, _object: str, target_domain: str) -> str:
+    return f"""{subject} fexec "{_object}" {{
+  enter(process, @"domain/{target_domain}");
+  return ALLOW;
+}}
+"""
+
+
+def setresuid_handler(subject: str, condition: str, target_domain: str) -> str:
+    return f"""{subject} setresuid {{
+  if ({condition}) {{
+    enter(process, @"domain/{target_domain}");
+    return ALLOW;
+  }}
+  return DENY;
+}}
 """
 
 
@@ -22,8 +49,9 @@ class Domain(UserDict):
 
 
 def make_unique(name: str, s: dict) -> str:
-    """If name is in s, returns a slightly modified version of name that is not
-    in s. Otherwise returns name."""
+    """If `name` is in `s`, return a slightly modified version of `name` that is
+    not in `s`. Otherwise return `name`.
+    """
     original_name = name
     c = count()
     while name in s:
@@ -33,21 +61,53 @@ def make_unique(name: str, s: dict) -> str:
 
 def get_access_name(access: Access) -> str:
     """Create a descriptive name for access."""
-    return f'{access.comm.replace(" ", "")}{access.uid}_{access.permissions.short_repr()}'
+    # TODO: replace in one pass
+    domain = access.comm.replace(" ", "").replace('/', '_')
+    return f'{domain}{access.uid}_{access.permissions.short_repr()}'
 
 
 def get_uniq_acess_name(access: Access, s: dict) -> str:
     return make_unique(get_access_name(access), s)
 
 
-def create_constable_policy(t: NpmTree) -> str:
+def space_name_from_exec_history(exec_history: tuple[str, ...]) -> str:
+    return ''.join(exec_history).replace(" ", "").replace('/', '_')
+
+
+def domain_transition_handlers(
+    domain_transition: dict[tuple[tuple, str, Any], tuple]
+) -> str:
+    config = ''
+
+    for k, v in domain_transition.items():
+        match k:
+            case ((old_exec_his, euid), 'exec', exec_file):
+                config += fexec_handler(
+                    f'{space_name_from_exec_history(old_exec_his)}{euid}',
+                    exec_file,
+                    f'{space_name_from_exec_history(v[0])}{euid}',
+                )
+            case ((exec_his, euid), 'setresuid', new_euid):
+                config += setresuid_handler(
+                    f'{space_name_from_exec_history(exec_his)}{euid}',
+                    f'setresuid.euid == {new_euid}',
+                    f'{space_name_from_exec_history(exec_his)}{new_euid}')
+
+    return config
+
+
+def create_constable_policy(
+    t: NpmTree, domain_transition: dict[tuple[tuple, str, Any], tuple]
+) -> str:
     # This dictionary contains all paths accessed (values) for a given Access
     # type (this will be used to create virtual spaces)
-    spaces = defaultdict(list)
+    spaces: DefaultDict[Access, list[str]] = defaultdict(list)
     for n in t.all_nodes_itr():
         if n.data is None:
             continue
         path = t.get_path(n)
+        # Create a list of paths or each `Access`. Note that `Access` is grouped
+        # (hashed) by permissions, uid and domain
         for access in n.data:
             spaces[access].append(path)
         # TODO: direct child nodes of generalized nodes should not be included
@@ -58,7 +118,7 @@ def create_constable_policy(t: NpmTree) -> str:
 
     config = STANDARD_TREES + STANDARD_SPACES
 
-    pprint(spaces)
+    # pprint(spaces)
 
     # Assign paths to virtual spaces
     spaces_names: dict[str, Access] = {}  # name to Access
@@ -75,16 +135,17 @@ def create_constable_policy(t: NpmTree) -> str:
 
     # Create domains and set permissions
     # Group accesses based on name and uid with tuple (comm, uid)
-    domains = defaultdict(Domain)
+    domains: DefaultDict[tuple[tuple[str], int], Domain()] = defaultdict(Domain)
     for space, access in spaces_names.items():
-        domain_tuple = (access.comm, access.uid)
+        domain_tuple = (access.domain, access.uid)
         for permission in access.permissions:
             domains[domain_tuple][permission].append(space)
 
-    for (comm, uid), domain in domains.items():
-        domain_name = f'{comm.replace(" ", "")}{uid}'
+    for (exec_history, uid), domain in domains.items():
+        concatenated_exec_history = space_name_from_exec_history(exec_history)
+        domain_name = f'{concatenated_exec_history}{uid}'
         config += f'space {domain_name} = "domain/{domain_name}";\n'
-        config += f'{domain_name}    '
+        config += f'{domain_name} '
         ending_comma = ''  # On the first row we don't need a comma
         for i, permission in enumerate(Permission):
             if not (permission_list := domain[permission]):
@@ -94,5 +155,9 @@ def create_constable_policy(t: NpmTree) -> str:
             ending_comma = ',\n        '
         # Finish the domain permission block here
         config += ';\n'
+
+    # Create domain transition handlers
+
+    config += domain_transition_handlers(domain_transition)
 
     return config

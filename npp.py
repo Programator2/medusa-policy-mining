@@ -9,13 +9,14 @@ from tree import DomainTree
 def main():
     tree = NpmTree()
     domain_tree = DomainTree()
+    domain_transition: dict[tuple[tuple, str, Any], tuple] = {}
     for arg in argv[1:]:
-        tree.load_log(parse_log(arg, domain_tree))
-    domain_tree.show()
+        log = parse_log(arg, domain_tree, domain_transition)
+        tree.load_log(log)
+
     tree.generalize(tree.get_node(tree.root))
-    print('Po generalizacii')
-    tree.show()
-    print(create_constable_policy(tree))
+    policy = create_constable_policy(tree, domain_transition)
+    print(policy)
 
 
 if __name__ == '__main__':
