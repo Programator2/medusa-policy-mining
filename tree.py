@@ -222,7 +222,7 @@ class NpmTree(GenericTree):
             node = self.get_parent(node)
         return path
 
-    def generalize(self, node: Node):
+    def generalize(self, node: Node, verbose=False):
         """Do a recursive depth-first search and on the way up TODO:
         finish"""
         if not (children := node.successors(self.identifier)):
@@ -254,7 +254,8 @@ class NpmTree(GenericTree):
                 if node.data == None:
                     node.data = NpmNode()
                 node.data.generalized.add(ac := perm)
-                print(f'Generalized {ac} for {self.get_path(node)}')
+                if verbose:
+                    print(f'Generalized {ac} for {self.get_path(node)}')
 
         # if len(access_set) == 1:
         #     # This means that all child items have the same accesses
