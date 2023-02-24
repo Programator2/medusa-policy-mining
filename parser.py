@@ -8,10 +8,10 @@ from pprint import pprint
 from treelib import Tree
 from tree import DomainTree
 from mpm_types import PathAccess, AuditLogRaw, AuditEntry
-from typing import DefaultDict, TypeVar, Any
+from typing import DefaultDict, TypeVar, Any, Iterable, Mapping
 
 
-def search_field(l: list[dict], key: str, _type: str = None) -> str | None:
+def search_field(l: Iterable[Mapping], key: str, _type: str = None) -> str | None:
     """Given a list of dictionaries `l`, search for a given `key`. The first
     matching value is returned.
 
@@ -29,7 +29,7 @@ def search_field(l: list[dict], key: str, _type: str = None) -> str | None:
     return None
 
 
-def create_log_entries(l: list[AuditLogRaw]) -> list[AuditEntry]:
+def create_log_entries(l: Iterable[AuditLogRaw]) -> list[AuditEntry]:
     """Filter and compress audit entries in the form of `AuditLogRaw` tuples
     into `AuditEntry` tuples
 
@@ -97,12 +97,17 @@ def assign_permissions(
     # might also contain UID at the time of exec.
     exec_histories: DefaultDict[int, tuple[str, ...]] = defaultdict(tuple)
 
+    # Refactoring in progress: TODO: remove `exec_histories` and leave only
+    # `domain`
+    domain: DefaultDict[int, tuple[tuple, ...]] = defaultdict(tuple)
+
     for key, msg_iter in serials:
         messages = list(msg_iter)
         # `messages` contains multiple messages from audit with the same serial.
         # This means it's the same operation, but the type of the message is
-        # different (e.g. one describing the decision of a security module,
-        # another one describing the current system call)
+        # different (e.g., one describing the decision of a security module
+        # (type=AVC), another one describing the current system call
+        # (type=SYSCALL))
         for m in messages:
             # This works only on messages from Medusa. They have AVC type.
             if m['type'] != 'AVC':
@@ -149,28 +154,34 @@ def assign_permissions(
                         ),
                     )
                 case 'exec':
-                    access = (PathAccess(m['filename'], Permission.READ),)
+                    path = m['path']
+                    access = (PathAccess(path, Permission.READ),)
                     # TODO: Some time in the future we will remove pid from AVC
                     # entry, so this should be replaced by `search_field`
                     initialize_exec_history(m, messages, exec_histories)
+                    initialize_exec_history(m, messages, domain)
+
                     old_exec_history = exec_histories[m['pid']]
-                    exec_histories[m['pid']] += (m['filename'],)
+                    old_domain = domain[m['pid']]
+
+                    exec_histories[m['pid']] += (path,)
+                    domain[m['pid']] += (
+                        (
+                            path,
+                            int(search_field(messages, 'euid', 'SYSCALL')),
+                        ),
+                    )
+
                     # A new domain has been created, add it to the tree
                     exec_history_tree._create_path(exec_histories[m['pid']])
 
                     domain_transition[
                         (
-                            (
-                                old_exec_history,
-                                int(search_field(messages, 'euid', 'SYSCALL')),
-                            ),
+                            old_domain,
                             'exec',
-                            m['filename'],
+                            path,
                         )
-                    ] = (
-                        exec_histories[m['pid']],
-                        int(search_field(messages, 'euid', 'SYSCALL')),
-                    )
+                    ] = domain[m['pid']]
                 case 'open':
                     access = (
                         PathAccess(
@@ -186,22 +197,24 @@ def assign_permissions(
                     # subject context (the process may be running under a
                     # different principal, and thus a different rules may
                     # apply). We consider changes to euid as domain transfers.
+                    old_domain = domain[m['pid']]
+                    domain[m['pid']] += (
+                        (
+                            domain[m['pid']][-1][0],
+                            int(m['euid']),
+                        ),
+                    )
                     domain_transition[
                         (
-                            (
-                                exec_histories[m['pid']],
-                                int(m['old_euid']),
-                            ),
+                            old_domain,
                             'setresuid',
                             int(m['euid']),
                         )
-                    ] = (
-                        exec_histories[m['pid']],
-                        int(m['euid']),
-                    )
+                    ] = domain[m['pid']]
 
             # Determine domain:
             initialize_exec_history(m, messages, exec_histories)
+            initialize_exec_history(m, messages, domain)
 
             # We know that some of these field are straight in the AVC message.
             # Others have to be found in other messages with the same serial
@@ -216,7 +229,7 @@ def assign_permissions(
                 path=access,
                 syscall=search_field(messages, 'syscall'),
                 operation=m['op'],
-                domain=exec_histories[m['pid']],
+                domain=domain[m['pid']],
             )
             # pprint(log)
 

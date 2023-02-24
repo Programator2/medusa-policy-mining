@@ -9,20 +9,47 @@ primary tree "fs";
 tree "domain" of process;
 """
 
-STANDARD_SPACES = """space all_domains = recursive "domain";
-primary space init = "domain/init";
+DEFAULT_DOMAIN = "domain/init"
+
+STANDARD_SPACES = f"""space all_domains = recursive "domain";
+primary space init = "{DEFAULT_DOMAIN}";
 space all_files = recursive "/";
 """
 
-GETPROCESS = """* getprocess * {
-  enter(process, @"domain/init");
+STANDARD_ACCESSES = """all_domains READ all_files, all_domains,
+            WRITE all_files, all_domains,
+            SEE all_files, all_domains;
+"""
+
+PEXEC_DEBUG = """all_domains pexec * {
+  log(spaces(process.vs) + " pexec " + pexec.filename);
   return ALLOW;
+}
+"""
+
+GETPROCESS = f"""* getprocess * {{
+  enter(process, @"{DEFAULT_DOMAIN}");
+  process.med_sact = 0x3fffffff;
+  return ALLOW;
+}}
+"""
+
+LOG_FUNCTION = """function log
+{
+  local printk buf.message=$1 + "\\n";
+  update buf;
+}
+"""
+
+INIT_FUNCTION = """function _init
+{
 }
 """
 
 
 def fexec_handler(subject: str, _object: str, target_domain: str) -> str:
     return f"""{subject} fexec "{_object}" {{
+  log("fexec {subject}->{_object}");
   enter(process, @"domain/{target_domain}");
   return ALLOW;
 }}
@@ -32,10 +59,20 @@ def fexec_handler(subject: str, _object: str, target_domain: str) -> str:
 def setresuid_handler(subject: str, condition: str, target_domain: str) -> str:
     return f"""{subject} setresuid {{
   if ({condition}) {{
+    log("setresuid {subject} flags=" + setresuid.flags + " ruid=" +
+        setresuid.old_ruid + "->" + setresuid.ruid + " euid=" +
+        setresuid.old_euid + "->" + setresuid.euid + " suid=" +
+        setresuid.old_suid + "->" + setresuid.suid +
+        " entering {target_domain}");
     enter(process, @"domain/{target_domain}");
     return ALLOW;
   }}
-  return DENY;
+  log("setresuid {subject} flags=" + setresuid.flags + " ruid=" +
+    setresuid.old_ruid + "->" + setresuid.ruid + " euid=" +
+    setresuid.old_euid + "->" + setresuid.euid + " suid=" +
+    setresuid.old_suid + "->" + setresuid.suid +
+    " DOMAIN UNCHANGED");
+  return ALLOW;
 }}
 """
 
@@ -43,9 +80,9 @@ def setresuid_handler(subject: str, condition: str, target_domain: str) -> str:
 class Domain(UserDict):
     def __init__(self):
         UserDict.__init__(self)
-        self.data[Permission.READ] = []
-        self.data[Permission.WRITE] = []
-        self.data[Permission.SEE] = []
+        self.data[Permission.READ] = set()
+        self.data[Permission.WRITE] = set()
+        self.data[Permission.SEE] = set()
 
 
 def make_unique(name: str, s: dict) -> str:
@@ -71,7 +108,25 @@ def get_uniq_acess_name(access: Access, s: dict) -> str:
 
 
 def space_name_from_exec_history(exec_history: tuple[str, ...]) -> str:
+    if not exec_history:
+        # `exec_history` is an empty tuple. This means that this exec was
+        # executed by the init process or some other proces for which we don't
+        # have more information. Use the default domain for this subject.
+        return f'"{DEFAULT_DOMAIN}"'
     return ''.join(exec_history).replace(" ", "").replace('/', '_')
+
+
+def space_name_from_domain(domain: tuple[tuple, ...]) -> str:
+    if not domain:
+        # `domain` is an empty tuple. This means that this exec was executed by
+        # the init process or some other proces for which we don't have more
+        # information. Use the default domain for this subject.
+        return f'"{DEFAULT_DOMAIN}"'
+    return (
+        ''.join((f'{filename}{euid}' for filename, euid in domain))
+        .replace(" ", "")
+        .replace('/', '_')
+    )
 
 
 def domain_transition_handlers(
@@ -79,19 +134,22 @@ def domain_transition_handlers(
 ) -> str:
     config = ''
 
-    for k, v in domain_transition.items():
+    # pprint(domain_transition)
+
+    for k, new_domain in domain_transition.items():
         match k:
-            case ((old_exec_his, euid), 'exec', exec_file):
+            case (old_domain, 'exec', exec_file):
+                domain = space_name_from_domain(old_domain)
                 config += fexec_handler(
-                    f'{space_name_from_exec_history(old_exec_his)}{euid}',
-                    exec_file,
-                    f'{space_name_from_exec_history(v[0])}{euid}',
+                    domain, exec_file, space_name_from_domain(new_domain)
                 )
-            case ((exec_his, euid), 'setresuid', new_euid):
+            case (old_domain, 'setresuid', new_euid):
+                domain = space_name_from_domain(old_domain)
                 config += setresuid_handler(
-                    f'{space_name_from_exec_history(exec_his)}{euid}',
+                    domain,
                     f'setresuid.euid == {new_euid}',
-                    f'{space_name_from_exec_history(exec_his)}{new_euid}')
+                    space_name_from_domain(new_domain),
+                )
 
     return config
 
@@ -114,13 +172,21 @@ def create_constable_policy(
         # in the final output policy
         if n.data.generalized:
             for access in n.data.generalized:
-                spaces[access].append(path + '/*')
+                spaces[access].append(path + '/.*')
 
-    config = STANDARD_TREES + STANDARD_SPACES
+    config = (
+        STANDARD_TREES
+        + STANDARD_SPACES
+        + STANDARD_ACCESSES
+        + LOG_FUNCTION
+        + GETPROCESS
+        + PEXEC_DEBUG
+        + INIT_FUNCTION
+    )
 
     # pprint(spaces)
 
-    # Assign paths to virtual spaces
+    # Assign file paths to virtual spaces.
     spaces_names: dict[str, Access] = {}  # name to Access
     for s, v in spaces.items():
         name = get_uniq_acess_name(s, spaces_names)
@@ -130,34 +196,40 @@ def create_constable_policy(
         for i, path in enumerate(v):
             if i != 0:
                 config += ' +\n    '
-            config += path
+            config += f'"{path}"'
         config += ';\n'
+
+    config += '\n'
 
     # Create domains and set permissions
     # Group accesses based on name and uid with tuple (comm, uid)
-    domains: DefaultDict[tuple[tuple[str], int], Domain()] = defaultdict(Domain)
+    domains: DefaultDict[tuple, Domain] = defaultdict(Domain)
     for space, access in spaces_names.items():
-        domain_tuple = (access.domain, access.uid)
+        domain = access.domain
         for permission in access.permissions:
-            domains[domain_tuple][permission].append(space)
+            domains[domain][permission].add(space)
+            # HACK: Since we "ignore" the SEE permission, we need to add
+            # everything from READ and WRITE to this set.
+            domains[domain][Permission.SEE].add(space)
 
-    for (exec_history, uid), domain in domains.items():
-        concatenated_exec_history = space_name_from_exec_history(exec_history)
-        domain_name = f'{concatenated_exec_history}{uid}'
-        config += f'space {domain_name} = "domain/{domain_name}";\n'
-        config += f'{domain_name} '
-        ending_comma = ''  # On the first row we don't need a comma
+    for domain_history, domain in domains.items():
+        domain_name = space_name_from_domain(domain_history)
+        config += f'primary space {domain_name} = "domain/{domain_name}";\n'
+        space_name_in_config = f'{domain_name} '
+        config += space_name_in_config
+        # On the first row we don't need a comma
+        ending_comma = ''
         for i, permission in enumerate(Permission):
-            if not (permission_list := domain[permission]):
+            if not (permission_set := domain[permission]):
+                # This permission type is empty, nothing to include
                 continue
             config += ending_comma + permission.name + ' '
-            config += ', '.join(permission_list)
-            ending_comma = ',\n        '
+            config += ', '.join(permission_set)
+            ending_comma = ',\n' + ' ' * len(space_name_in_config)
         # Finish the domain permission block here
         config += ';\n'
 
     # Create domain transition handlers
-
-    config += domain_transition_handlers(domain_transition)
+    config += '\n' + domain_transition_handlers(domain_transition)
 
     return config
