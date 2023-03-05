@@ -3,6 +3,7 @@ from collections import UserDict, defaultdict
 from itertools import count
 from pprint import pprint
 from typing import DefaultDict, Any
+from generalize import generalize_proc
 
 STANDARD_TREES = """tree "fs" clone of file by getfile getfile.filename;
 primary tree "fs";
@@ -196,6 +197,8 @@ def create_constable_policy(
         for i, path in enumerate(v):
             if i != 0:
                 config += ' +\n    '
+            # Generalize common paths
+            path = generalize_proc(path)
             config += f'"{path}"'
         config += ';\n'
 
