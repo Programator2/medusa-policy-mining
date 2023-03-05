@@ -9,6 +9,8 @@ from collections.abc import Iterable
 from more_itertools import first
 from permission import Permission
 from mpm_types import AuditEntry
+from generalize import generalize_nonexistent
+from fs2json.db import DatabaseRead
 import sys
 
 
@@ -152,10 +154,11 @@ class DomainTree(GenericTree):
 
 
 class NpmTree(GenericTree):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, db=None, **kwargs):
         super().__init__(self, args, kwargs)
         self.npm_root = self.create_node('/', '/')
         self.root = self.npm_root.identifier
+        self.db = (DatabaseRead(db) if db is not None else None)
 
     def _create_path(self, path: str):
         """Create necessary nodes in the tree to represent a path.
@@ -217,7 +220,6 @@ class NpmTree(GenericTree):
         """Print full path for a given node"""
         path = ''
         while node != self.npm_root:
-            # print('at', node.tag)
             path = '/' + node.tag + path
             node = self.get_parent(node)
         return path
@@ -264,6 +266,24 @@ class NpmTree(GenericTree):
         #     node.data.generalized.add(ac := first(access_set))
         #     print(f'Generalized {ac} for {self.get_path(node)}')
         # print('Access set ma', len(access_set), 'poloziek')
+
+    def generalize_nonexistent(self, verbose=False):
+        # TODO: Take order of generalization into consideration. For example,
+        # after `/proc/.*/` generalization, these folders shouldn't be used in
+        # following generalizations, such as this one.
+        if self.db is None:
+            print("Can't generalize non-existent. Database not loaded.", file=sys.stderr)
+            return
+        leaves = self.leaves()
+        for l in leaves:
+            path = self.get_path(l)
+            generalized_path = generalize_nonexistent(path, self.db)
+            if generalized_path:
+                if l.data == None:
+                    l.data = NpmNode()
+                l.data.generalized.update(l.data)
+                if verbose:
+                    print(f'Generalized nonexistent {path}.')
 
     # TODO: override this function without copying so much stuff from the
     # library
