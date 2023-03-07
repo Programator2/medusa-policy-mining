@@ -11,6 +11,10 @@ from permission import Permission
 from mpm_types import AuditEntry
 from generalize import generalize_nonexistent
 from fs2json.db import DatabaseRead
+from config import (
+    OwnerGeneralizationStrategy,
+    OWNER_GENERALIZATION_STRATEGY,
+)
 import sys
 
 
@@ -92,10 +96,7 @@ class NpmNode(set):
         `READ|WRITE`.
         """
         for a in self:
-            if (
-                access.uid == a.uid
-                and access.domain == a.domain
-            ):
+            if access.uid == a.uid and access.domain == a.domain:
                 try:
                     self.remove(a)
                 except KeyError:
@@ -158,7 +159,7 @@ class NpmTree(GenericTree):
         super().__init__(self, args, kwargs)
         self.npm_root = self.create_node('/', '/')
         self.root = self.npm_root.identifier
-        self.db = (DatabaseRead(db) if db is not None else None)
+        self.db = DatabaseRead(db) if db is not None else None
 
     def _create_path(self, path: str):
         """Create necessary nodes in the tree to represent a path.
@@ -175,9 +176,7 @@ class NpmTree(GenericTree):
 
         for d in log:
             # Create path in the tree
-            node = self._create_path(
-                d.path.removesuffix(' (deleted)')
-            )
+            node = self._create_path(d.path.removesuffix(' (deleted)'))
 
             perm = Permission(int(d.permission))
 
@@ -272,7 +271,10 @@ class NpmTree(GenericTree):
         # after `/proc/.*/` generalization, these folders shouldn't be used in
         # following generalizations, such as this one.
         if self.db is None:
-            print("Can't generalize non-existent. Database not loaded.", file=sys.stderr)
+            print(
+                "Can't generalize non-existent. Database not loaded.",
+                file=sys.stderr,
+            )
             return
         leaves = self.leaves()
         for l in leaves:
@@ -284,6 +286,76 @@ class NpmTree(GenericTree):
                 l.data.generalized.update(l.data)
                 if verbose:
                     print(f'Generalized nonexistent {path}.')
+
+    @staticmethod
+    def all_if_any(it: Iterable) -> bool:
+        """Return `True` if all elements of `it` are true and there is at least
+        one element."""
+        try:
+            item = next(it)
+        except StopIteration:
+            return False
+        return all(it) if item else False
+
+    def generalize_by_owner(self, verbose: bool = False):
+        """See `OwnerGeneralizationStrategy` for explanation of used
+        strategies."""
+        for node in self.all_nodes_itr():
+            if (data := node.data) is None:
+                continue
+            for access in data:
+                if (
+                    OWNER_GENERALIZATION_STRATEGY
+                    & OwnerGeneralizationStrategy.OWN_DIR
+                ):
+                    path = self.get_path(node)
+                    if self.db.is_directory(
+                        path
+                    ) and access.uid == self.db.get_owner(path):
+                        data.generalized.add(access)
+                        if verbose:
+                            print(
+                                f"Generalized by owner of '{path}' for {access}."
+                            )
+                elif (
+                    OWNER_GENERALIZATION_STRATEGY
+                    & OwnerGeneralizationStrategy.OWN_FILES
+                ):
+                    if self.all_if_any(
+                        access.uid == inode.uid
+                        for inode in self.db.get_children(self.get_path(node))
+                    ):
+                        data.generalized.add(access)
+                        if verbose:
+                            print(
+                                f"Generalized by owner of files in '{path}' for {access}."
+                            )
+                elif (
+                    OWNER_GENERALIZATION_STRATEGY
+                    & OwnerGeneralizationStrategy.READ_FILES
+                ):
+                    if self.all_if_any(
+                        self.db.can_read(ino, access.uid)
+                        for ino in self.db.get_children(self.get_path(node))
+                    ):
+                        data.generalized.add(access)
+                        if verbose:
+                            print(
+                                f"Generalized by read access of files in '{path}' for {access}."
+                            )
+                elif (
+                    OWNER_GENERALIZATION_STRATEGY
+                    & OwnerGeneralizationStrategy.WRITE_FILES
+                ):
+                    if self.all_if_any(
+                        self.db.can_write(ino, access.uid)
+                        for ino in self.db.get_children(self.get_path(node))
+                    ):
+                        data.generalized.add(access)
+                        if verbose:
+                            print(
+                                f"Generalized by write access of files in '{path}' for {access}."
+                            )
 
     # TODO: override this function without copying so much stuff from the
     # library

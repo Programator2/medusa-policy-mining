@@ -18,22 +18,8 @@ def generalize_proc(path: str) -> str:
     return re.sub(r'^/proc/[0-9]+/', r'/proc/[0-9]+/', path, 1)
 
 
-# TODO: podla vlastnika priecinku (nutne skontrolovat kazdy priecinok)
-def generalize_by_owner(path: str, db):
-    # Based on what information we will decide?
-    # 1) If user owns the directory, it will be automatically generalized
-    # 2) If the user own all the files in the directory, it will be
-    # automatically generalized
-    # 3) If the user has read access to all the files in the directory, it will
-    # be automatically generalized read star access to contents of this
-    # directory
-    # 4) If the user has write access to all the files in the directory, it will
-    # be automatically generalized write star access to contents of this
-    # directory
-    pass
-
-
-# TODO: Podla skutocneho obsahu priecinka (to iste ako klasicky algoritmmus)
+# TODO: Based on the real contents of the folder (normal algorithm, but with
+# information from the database applied)
 def generalize_full_fs(path: str, db):
     pass
 
@@ -58,6 +44,7 @@ def generalize_nonexistent(path: str, db: DatabaseRead):
     # Path doesn't exist, generalize up to last component
     return str(PurePosixPath(path) / '.*')
 
-# TODO: Porovmat viac behov
+
+# TODO: Compare multiple runs
 def generalize_mupltiple_runs():
     pass
