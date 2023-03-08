@@ -61,6 +61,10 @@ class Access:
         self._domain = domain
 
     def __repr__(self):
+        # This is a shortened version, for the full version see `full_repr`
+        return f'<{str(hash(self.domain))[:2]} {self.domain[-1][0]}({self.domain[-1][1]}): {self.permissions}>'
+
+    def full_repr(self) -> str:
         return f'<{self.domain} {self.comm} ({self.uid}): {self.permissions}>'
 
     def __eq__(self, other):
