@@ -16,6 +16,7 @@ from config import (
     OWNER_GENERALIZATION_STRATEGY,
 )
 import sys
+from copy import copy
 
 
 class Access:
@@ -88,7 +89,36 @@ class NpmNode(set):
         self.generalized: set[Access] = set()
         super().__init__(self, *args)
 
-    def add_item(self, access: Access):
+    @staticmethod
+    def generic_add_access(s: set, access: Access) -> None:
+        """Add `access` to `s`, if it isn't already present in the set. If there
+        is an access with the same uid and domain but different permissions,
+        adjust permissions of the existing access accordingly. This can only add
+        permissions, not remove them.
+
+        For example, if there is an access READ already in the list and
+        `add_access` is called with another access with the same uid and domain,
+        but with WRITE permission, the new permissions will be set to
+        `READ|WRITE`.
+        """
+        for a in s:
+            if access.uid == a.uid and access.domain == a.domain:
+                try:
+                    s.remove(a)
+                except KeyError:
+                    print("Pridavany:")
+                    pprint(access)
+                    print("Porovnavany:")
+                    pprint(a)
+                    print("Obsah:")
+                    pprint(s)
+                    sys.exit(-1)
+                a.permissions = access.permissions | a.permissions
+                s.add(a)
+                return
+        s.add(access)
+
+    def add_access(self, access: Access):
         """Add `access` to `self`, if it isn't already present in the set. If
         there is an access with the same uid and domain but different
         permissions, adjust permissions of the existing access accordingly. This
@@ -99,23 +129,7 @@ class NpmNode(set):
         but with WRITE permission, the new permissions will be set to
         `READ|WRITE`.
         """
-        for a in self:
-            if access.uid == a.uid and access.domain == a.domain:
-                try:
-                    self.remove(a)
-                except KeyError:
-                    print("Pridavany:")
-                    pprint(access)
-                    print("Porovnavany:")
-                    pprint(a)
-                    print("Obsah:")
-                    pprint(self)
-                    sys.exit(-1)
-                # print('Adding permissions for', a)
-                a.permissions = access.permissions | a.permissions
-                self.add(a)
-                return
-        self.add(access)
+        self.generic_add_access(self, access)
 
 
 class GenericTree(Tree):
@@ -165,7 +179,7 @@ class NpmTree(GenericTree):
         self.root = self.npm_root.identifier
         self.db = DatabaseRead(db) if db is not None else None
 
-    def _create_path(self, path: str):
+    def _create_path(self, path: str) -> Node:
         """Create necessary nodes in the tree to represent a path.
 
         :param path: string in the form of `/this/is/a/path`. It has to start
@@ -192,7 +206,7 @@ class NpmTree(GenericTree):
             access.comm = d.proctitle
             access.domain = d.domain
 
-            node.data.add_item(access)
+            node.data.add_access(access)
 
     def get_parent(self, node: Node) -> Node:
         """Return parent Node object for node"""
@@ -227,48 +241,54 @@ class NpmTree(GenericTree):
             node = self.get_parent(node)
         return path
 
-    def generalize(self, node: Node, verbose=False):
+    def generalize(self, node: Node, verbose=False) -> None:
         """Do a recursive depth-first search and on the way up TODO:
-        finish"""
+        finish
+
+        Here we work with the assumption that if all files in a folder have the
+        same access permission, we can generalize this access permission for the
+        entire contents of the folder.
+        """
         if not (children := node.successors(self.identifier)):
+            # Skip leaves
             return
         for n in children:
-            self.generalize(self.get_node(n))
+            # Depth-first search
+            self.generalize(self.get_node(n), verbose)
+
         # TODO Maybe all nodes should include NpmNode as their data, because now
-        # we have to checke everywhere if data is not None
+        # we have to check everywhere if data is not None
+
+        # Get accesses from child items. Not accessed nodes have `None` `data`
+        # attribute.
         access_sets = filter(
             lambda x: x is not None, (self.get_node(n).data for n in children)
         )
-        # access_sets_list = list(access_sets)
-        # breakpoint()
-        # number_of_items = len(access_sets_list)
+
         c = Counter()
-        items_count = 0
-        for access in access_sets:
-            items_count += 1
-            for perm in access:
-                c[perm] += 1
-        # access_set = set().union(*access_sets)
+        total_count = 0
+        for access_set in access_sets:
+            total_count += 1
+            for access in access_set:
+                # access is `Access`
+                for permission in access.permissions:
+                    new_access = copy(access)
+                    new_access.permissions = permission
+                    c[new_access] += 1
+
         # TODO: If you want to include threshold parameter, you need to compute
         # the ratio here
-        for perm, number in c.items():
+        generalized = set()
+        for access, number in c.items():
             # This just checks for the complete number of items not considering
             # the type (directory/file)
-            if number == items_count:
+            if number == total_count:
                 # This means that all child items have the same accesses
                 if node.data == None:
                     node.data = NpmNode()
-                node.data.generalized.add(ac := perm)
+                NpmNode.generic_add_access(node.data.generalized, ac := access)
                 if verbose:
                     print(f'Generalized {ac} for {self.get_path(node)}')
-
-        # if len(access_set) == 1:
-        #     # This means that all child items have the same accesses
-        #     if node.data == None:
-        #         node.data = NpmNode()
-        #     node.data.generalized.add(ac := first(access_set))
-        #     print(f'Generalized {ac} for {self.get_path(node)}')
-        # print('Access set ma', len(access_set), 'poloziek')
 
     def generalize_nonexistent(self, verbose=False):
         # TODO: Take order of generalization into consideration. For example,
