@@ -4,10 +4,12 @@ from sys import argv
 from policy import create_constable_policy
 from parser import parse_log
 from tree import DomainTree
+from fs2json.db import DatabaseRead
 
 
 def main():
     tree = NpmTree(db='fs.db')
+    db = DatabaseRead('fs.db')
     domain_tree = DomainTree()
     domain_transition: dict[tuple[tuple, str, Any], tuple] = {}
     for arg in argv[1:]:
@@ -18,6 +20,7 @@ def main():
     tree.generalize_nonexistent(True)
     policy = create_constable_policy(tree, domain_transition)
     print(policy)
+    db.close()
 
 
 if __name__ == '__main__':

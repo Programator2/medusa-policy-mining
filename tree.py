@@ -175,11 +175,10 @@ class DomainTree(GenericTree):
 
 
 class NpmTree(GenericTree):
-    def __init__(self, *args, db=None, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(self, args, kwargs)
         self.npm_root = self.create_node('/', '/')
         self.root = self.npm_root.identifier
-        self.db = DatabaseRead(db) if db is not None else None
 
     def _create_path(self, path: str) -> Node:
         """Create necessary nodes in the tree to represent a path.
@@ -290,14 +289,14 @@ class NpmTree(GenericTree):
                 if verbose:
                     print(f'Generalized (from logs) {ac} for {self.get_path(node)}')
 
-    def generalize_fs(self, verbose=False, db: DatabaseRead):
+    def generalize_fs(self, db: DatabaseRead, verbose=False):
         """Same as `generalize`, but with fs database."""
         if not (children := node.successors(self.identifier)):
             # Skip leaves
             return
         for n in children:
             # Depth-first search
-            self.generalize_fs(self.get_node(n), verbose, db)
+            self.generalize_fs(self.get_node(n), db, verbose)
 
         # TODO Maybe all nodes should include NpmNode as their data, because now
         # we have to check everywhere if data is not None
@@ -331,20 +330,14 @@ class NpmTree(GenericTree):
                 if verbose:
                     print(f'Generalized (with fs) {ac} for {path}')
 
-    def generalize_nonexistent(self, verbose=False):
+    def generalize_nonexistent(self, db: DatabaseRead, verbose=False):
         # TODO: Take order of generalization into consideration. For example,
         # after `/proc/.*/` generalization, these folders shouldn't be used in
         # following generalizations, such as this one.
-        if self.db is None:
-            print(
-                "Can't generalize non-existent. Database not loaded.",
-                file=sys.stderr,
-            )
-            return
         leaves = self.leaves()
         for l in leaves:
             path = self.get_path(l)
-            generalized_path = generalize_nonexistent(path, self.db)
+            generalized_path = generalize_nonexistent(path, db)
             if generalized_path:
                 if l.data == None:
                     l.data = NpmNode()
@@ -362,7 +355,7 @@ class NpmTree(GenericTree):
             return False
         return all(it) if item else False
 
-    def generalize_by_owner(self, verbose: bool = False):
+    def generalize_by_owner(self, db: DatabaseRead, verbose: bool = False):
         """See `OwnerGeneralizationStrategy` for explanation of used
         strategies."""
         for node in self.all_nodes_itr():
@@ -374,9 +367,9 @@ class NpmTree(GenericTree):
                     & OwnerGeneralizationStrategy.OWN_DIR
                 ):
                     path = self.get_path(node)
-                    if self.db.is_directory(
+                    if db.is_directory(
                         path
-                    ) and access.uid == self.db.get_owner(path):
+                    ) and access.uid == db.get_owner(path):
                         data.generalized.add(access)
                         if verbose:
                             print(
@@ -388,7 +381,7 @@ class NpmTree(GenericTree):
                 ):
                     if self.all_if_any(
                         access.uid == inode.uid
-                        for inode in self.db.get_children(self.get_path(node))
+                        for inode in db.get_children(self.get_path(node))
                     ):
                         data.generalized.add(access)
                         if verbose:
@@ -400,8 +393,8 @@ class NpmTree(GenericTree):
                     & OwnerGeneralizationStrategy.READ_FILES
                 ):
                     if self.all_if_any(
-                        self.db.can_read(ino, access.uid)
-                        for ino in self.db.get_children(self.get_path(node))
+                        db.can_read(ino, access.uid)
+                        for ino in db.get_children(self.get_path(node))
                     ):
                         data.generalized.add(access)
                         if verbose:
@@ -413,8 +406,8 @@ class NpmTree(GenericTree):
                     & OwnerGeneralizationStrategy.WRITE_FILES
                 ):
                     if self.all_if_any(
-                        self.db.can_write(ino, access.uid)
-                        for ino in self.db.get_children(self.get_path(node))
+                        db.can_write(ino, access.uid)
+                        for ino in db.get_children(self.get_path(node))
                     ):
                         data.generalized.add(access)
                         if verbose:
