@@ -18,12 +18,6 @@ def generalize_proc(path: str) -> str:
     return re.sub(r'^/proc/[0-9]+/', r'/proc/[0-9]+/', path, 1)
 
 
-# TODO: Based on the real contents of the folder (normal algorithm, but with
-# information from the database applied)
-def generalize_full_fs(path: str, db):
-    pass
-
-
 def generalize_nonexistent(path: str, db: DatabaseRead):
     """Generalize non-existent files.
 

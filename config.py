@@ -27,6 +27,14 @@ the directory for the directory to be generalized (globbed).
 Total number of items in a directory is derived *just* from the logs.
 """
 
+GENERALIZE_FS_THRESHOLD = 1.0
+"""Fraction of how many items need to have the same domain and permission from
+the directory for the directory to be generalized (globbed).
+
+Total number of items in a directory is derived from the filesystem snapshot
+(database).
+"""
+
 GENERALIZE_PROC = True
 """`True` if accesses to /proc/.*/ should be generalized"""
 

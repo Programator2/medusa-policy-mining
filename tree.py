@@ -15,6 +15,7 @@ from config import (
     OwnerGeneralizationStrategy,
     OWNER_GENERALIZATION_STRATEGY,
     GENERALIZE_THRESHOLD,
+    GENERALIZE_FS_THRESHOLD
 )
 import sys
 from copy import copy
@@ -288,6 +289,47 @@ class NpmTree(GenericTree):
                 NpmNode.generic_add_access(node.data.generalized, ac := access)
                 if verbose:
                     print(f'Generalized (from logs) {ac} for {self.get_path(node)}')
+
+    def generalize_fs(self, verbose=False, db: DatabaseRead):
+        """Same as `generalize`, but with fs database."""
+        if not (children := node.successors(self.identifier)):
+            # Skip leaves
+            return
+        for n in children:
+            # Depth-first search
+            self.generalize_fs(self.get_node(n), verbose, db)
+
+        # TODO Maybe all nodes should include NpmNode as their data, because now
+        # we have to check everywhere if data is not None
+
+        # Get accesses from child items. Not accessed nodes have `None` `data`
+        # attribute.
+        access_sets = filter(
+            lambda x: x is not None, (self.get_node(n).data for n in children)
+        )
+
+        path = self.get_path(node)
+        c = Counter()
+        total_count = db.get_num_children(path)
+        for access_set in access_sets:
+            for access in access_set:
+                # access is `Access`
+                for permission in access.permissions:
+                    new_access = copy(access)
+                    new_access.permissions = permission
+                    c[new_access] += 1
+
+        generalized = set()
+        for access, number in c.items():
+            # This just checks for the complete number of items not considering
+            # the type (directory/file)
+            if number / total_count >= GENERALIZE_FS_THRESHOLD:
+                # This means that all child items have the same accesses
+                if node.data == None:
+                    node.data = NpmNode()
+                NpmNode.generic_add_access(node.data.generalized, ac := access)
+                if verbose:
+                    print(f'Generalized (with fs) {ac} for {path}')
 
     def generalize_nonexistent(self, verbose=False):
         # TODO: Take order of generalization into consideration. For example,
