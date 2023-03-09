@@ -14,6 +14,7 @@ from fs2json.db import DatabaseRead
 from config import (
     OwnerGeneralizationStrategy,
     OWNER_GENERALIZATION_STRATEGY,
+    GENERALIZE_THRESHOLD,
 )
 import sys
 from copy import copy
@@ -276,19 +277,17 @@ class NpmTree(GenericTree):
                     new_access.permissions = permission
                     c[new_access] += 1
 
-        # TODO: If you want to include threshold parameter, you need to compute
-        # the ratio here
         generalized = set()
         for access, number in c.items():
             # This just checks for the complete number of items not considering
             # the type (directory/file)
-            if number == total_count:
+            if number / total_count >= GENERALIZE_THRESHOLD:
                 # This means that all child items have the same accesses
                 if node.data == None:
                     node.data = NpmNode()
                 NpmNode.generic_add_access(node.data.generalized, ac := access)
                 if verbose:
-                    print(f'Generalized {ac} for {self.get_path(node)}')
+                    print(f'Generalized (from logs) {ac} for {self.get_path(node)}')
 
     def generalize_nonexistent(self, verbose=False):
         # TODO: Take order of generalization into consideration. For example,
