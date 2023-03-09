@@ -28,9 +28,12 @@ Total number of items in a directory is derived *just* from the logs.
 """
 
 GENERALIZE_PROC = True
+"""`True` if accesses to /proc/.*/ should be generalized"""
+
 OWNER_GENERALIZATION_STRATEGY = (
     OwnerGeneralizationStrategy.OWN_DIR
     | OwnerGeneralizationStrategy.OWN_FILES
     | OwnerGeneralizationStrategy.READ_FILES
     | OwnerGeneralizationStrategy.WRITE_FILES
 )
+"""Which generalization strategies will be used for UGO generalization."""
