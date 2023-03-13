@@ -384,16 +384,21 @@ class NpmTree(GenericTree):
         # TODO: Take order of generalization into consideration. For example,
         # after `/proc/.*/` generalization, these folders shouldn't be used in
         # following generalizations, such as this one.
-        leaves = self.leaves()
-        for l in leaves:
-            path = self.get_path(l)
+
+        # TODO: Not just leaves but every accessed node
+        for node in self.all_nodes_itr():
+            if (data := node.data) is None:
+                continue
+            path = self.get_path(node)
             generalized_path = generalize_nonexistent(path, db)
             if generalized_path:
-                if l.data == None:
-                    l.data = NpmNode()
-                l.data.generalized.update(l.data)
+                parent = self.get_parent(node)
+                if parent.data == None:
+                    parent.data = NpmNode()
+                # TODO: Also update generalizations?
+                parent.data.generalized.update(node.data)
                 if verbose:
-                    print(f'Generalized nonexistent {path}.')
+                    print(f'Generalized parent for nonexistent {path}.')
 
     @staticmethod
     def all_if_any(it: Iterable) -> bool:
