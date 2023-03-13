@@ -3,7 +3,7 @@ from collections import UserDict, defaultdict
 from itertools import count
 from pprint import pprint
 from typing import DefaultDict, Any
-from generalize import generalize_proc
+from generalize.generalize import generalize_proc
 
 STANDARD_TREES = """tree "fs" clone of file by getfile getfile.filename;
 primary tree "fs";

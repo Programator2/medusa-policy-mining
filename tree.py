@@ -9,7 +9,7 @@ from collections.abc import Iterable
 from more_itertools import first
 from permission import Permission
 from mpm_types import AuditEntry
-from generalize import generalize_nonexistent
+from generalize.generalize import generalize_nonexistent
 from fs2json.db import DatabaseRead
 from config import (
     OwnerGeneralizationStrategy,
@@ -19,6 +19,7 @@ from config import (
 )
 import sys
 from copy import copy
+from re import search
 
 
 class Access:
@@ -89,6 +90,13 @@ class NpmNode(set):
         # this node. This access should be used for node/* rule. This set should
         # contain just one object, but I'm keeping it as a set just in case.
         self.generalized: set[Access] = set()
+
+        # Used by multiple runs generalizator
+        self.visited = False
+
+        # Nodes represented by a regexp set this to `True`
+        self.is_regexp = False
+
         super().__init__(self, *args)
 
     @staticmethod
@@ -241,6 +249,48 @@ class NpmTree(GenericTree):
             path = '/' + node.tag + path
             node = self.get_parent(node)
         return path
+
+    def get_accessed_paths(self) -> dict[str, Node]:
+        ret = {}
+        for node in self.all_nodes_itr():
+            if (data := node.data) is None:
+                continue
+            ret[self.get_path(node)] = node
+        return ret
+
+    def add_path_generalization(self, path: str) -> Node:
+        """Add regexp generalization to the tree.
+
+        :param path: String starting with `/` and ending with last component
+        (not `/`). Path components that contain regexps will be inserted into
+        node's generalization set.
+        """
+        entries = filter(lambda x: bool(x), path.split('/'))
+        parent = self.npm_root
+        for e in entries:
+            # Check if this is a regular expression (currently checking just for
+            # the dot)
+            exists = next(
+                filter(
+                    lambda x: x.tag == e,
+                    (self[y] for y in parent.successors(self.identifier)),
+                ),
+                None,
+            )
+            if exists is not None:
+                parent = exists
+            else:
+                pattern = r'[^\\]\.'
+                if search(pattern, e) is not None:
+                    is_regexp = True
+                else:
+                    is_regexp = False
+                data = NpmNode()
+                data.is_regexp = is_regexp
+                parent = self.create_node(e, parent=parent.identifier, data=data)
+        # Transfer permission from regexed paths, maybe return and do it in the
+        # caller
+        return parent
 
     def generalize(self, node: Node, verbose=False) -> None:
         """Do a recursive depth-first search and on the way up TODO:

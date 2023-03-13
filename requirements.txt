@@ -1,2 +1,4 @@
 treelib==1.6.1
 more-itertools==9.0.0
+string-grouper==0.6.1
+diff-match-patch==20200713

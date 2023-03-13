@@ -37,8 +37,3 @@ def generalize_nonexistent(path: str, db: DatabaseRead):
         return ''
     # Path doesn't exist, generalize up to last component
     return str(PurePosixPath(path) / '.*')
-
-
-# TODO: Compare multiple runs
-def generalize_mupltiple_runs():
-    pass
