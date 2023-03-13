@@ -28,6 +28,16 @@ class BlessedList(UserList):
             self._ensure_index(i)
             return self.data[i]
 
+    def __iter__(self):
+        i = 0
+        try:
+            while True:
+                v = self.data[i]
+                yield v
+                i += 1
+        except IndexError:
+            return
+
     def __setitem__(self, i, item):
         self._ensure_index(i)
         self.data[i] = item
