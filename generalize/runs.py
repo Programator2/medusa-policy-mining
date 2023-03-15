@@ -118,7 +118,9 @@ def generalize_mupltiple_runs(db: DatabaseRead, *trees: NpmTree) -> NpmTree:
                     if all(fullmatch(reg, row.path) for row in others):
                         break
                 else:
-                    raise RuntimeError("Regexp that covers all paths doesn't exist.")
+                    raise RuntimeError(
+                        "Regexp that covers all paths doesn't exist."
+                    )
             else:
                 reg = regexps[0]
 
@@ -133,7 +135,9 @@ def generalize_mupltiple_runs(db: DatabaseRead, *trees: NpmTree) -> NpmTree:
                         print(f"couldn't find {row.path}")
                         continue
                     if node is None:
-                        raise RuntimeError(f'Unexpected: {row.path} not in the tree.')
+                        raise RuntimeError(
+                            f'Unexpected: {row.path} not in the tree.'
+                        )
                     accesses.update(node.data)
                     node.data.clear()
                     break
