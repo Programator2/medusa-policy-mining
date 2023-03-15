@@ -8,7 +8,7 @@ from tree import DomainTree
 from pprint import pprint
 from blessed import BlessedList
 from fs2json.db import DatabaseRead
-from generalize.runs import generalize_mupltiple_runs
+from generalize.runs import generalize_mupltiple_runs, merge_tree
 from more_itertools import split_at
 
 
@@ -50,9 +50,11 @@ same service can be specified without the splitter.""", file=stderr)
     tree.show()
     # tree.generalize_by_owner(db, verbose=True)
 
-    # regex_tree = generalize_mupltiple_runs(db, *trees)
+    regex_tree = generalize_mupltiple_runs(db, *trees)
+    new_tree = merge_tree(*trees)
     # policy = create_constable_policy(tree, domain_transition)
     # print(policy)
+    new_tree.show()
     db.close()
     return 0
 

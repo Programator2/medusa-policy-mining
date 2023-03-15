@@ -11,6 +11,7 @@ from diff_match_patch import diff_match_patch as DiffMatchPatch
 from collections.abc import Iterable
 from re import escape, fullmatch
 from collections import Counter
+from copy import deepcopy
 
 
 def regex_from_diff(diff: Iterable[tuple[int, str]]) -> str:
@@ -102,7 +103,8 @@ def generalize_mupltiple_runs(db: DatabaseRead, *trees: NpmTree) -> NpmTree:
             for row in others:
                 diff = dmp.diff_main(control.path, row.path)
                 dmp.diff_cleanupSemantic(diff)
-                # print(row.path, ':', regexp := regex_from_diff(diff))
+                regexp = regex_from_diff(diff)
+                # print(row.path, ':', regexp)
                 regexps.append(regexp)
             # print('-' * 80)
 
@@ -147,3 +149,30 @@ def generalize_mupltiple_runs(db: DatabaseRead, *trees: NpmTree) -> NpmTree:
 
         # print('=' * 80)
     # regex_tree.show()
+
+
+def _check_tree(new_tree: NpmTree, new_node: Node, tree: NpmTree, node: Node):
+    children_nids = node.successors(tree.identifier)
+    new_children_nids = new_node.successors(new_tree.identifier)
+    new_children_tag_to_node = {
+        new_tree.get_node(n).tag: new_tree.get_node(n)
+        for n in new_children_nids
+    }
+    for child_nid in children_nids:
+        child = tree.get_node(child_nid)
+        if child.tag in new_children_tag_to_node:
+            # This directory is already present in the new tree, no need to move
+            # anything
+            # TODO: Move permissions
+            continue
+        # Copy `child` to the `new_tree` at the same position
+        new_child_node = deepcopy(child)
+        new_tree.add_node(new_child_node, new_node)
+        _check_tree(new_tree, new_child_node, tree, child)
+
+
+def merge_tree(*trees: NpmTree) -> NpmTree:
+    new_tree = NpmTree()
+    for tree in trees:
+        _check_tree(new_tree, new_tree.npm_root, tree, tree.npm_root)
+    return new_tree

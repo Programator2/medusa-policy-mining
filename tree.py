@@ -85,7 +85,7 @@ class Access:
 class NpmNode(set):
     """Represents internal data of the node (especially permissions)."""
 
-    def __init__(self, *args):
+    def __init__(self, args: Iterable = None):
         # Contains set of `Access` objects that were generalized (globbed) for
         # this node. This access should be used for node/* rule. This set should
         # contain just one object, but I'm keeping it as a set just in case.
@@ -97,7 +97,8 @@ class NpmNode(set):
         # Nodes represented by a regexp set this to `True`
         self.is_regexp = False
 
-        super().__init__(self, *args)
+        if args is not None:
+            self.update(args)
 
     @staticmethod
     def generic_add_access(s: set, access: Access) -> None:
