@@ -153,6 +153,7 @@ def generalize_mupltiple_runs(db: DatabaseRead, *trees: NpmTree) -> NpmTree:
 
         # print('=' * 80)
     # regex_tree.show()
+    return regex_tree
 
 
 def _check_tree(new_tree: NpmTree, new_node: Node, tree: NpmTree, node: Node):
@@ -168,10 +169,12 @@ def _check_tree(new_tree: NpmTree, new_node: Node, tree: NpmTree, node: Node):
             # This directory is already present in the new tree, no need to move
             # anything
             # TODO: Move permissions
-            continue
-        # Copy `child` to the `new_tree` at the same position
-        new_child_node = deepcopy(child)
-        new_tree.add_node(new_child_node, new_node)
+            new_child_node = new_children_tag_to_node[child.tag]
+            pass
+        else:
+            # Copy `child` to the `new_tree` at the same position
+            new_child_node = deepcopy(child)
+            new_tree.add_node(new_child_node, new_node)
         _check_tree(new_tree, new_child_node, tree, child)
 
 
