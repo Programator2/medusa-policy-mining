@@ -6,7 +6,6 @@ from policy import create_constable_policy
 from parser import parse_log
 from tree import DomainTree
 from pprint import pprint
-from blessed import BlessedList
 from fs2json.db import DatabaseRead
 from generalize.runs import generalize_mupltiple_runs, merge_tree
 from more_itertools import split_at
