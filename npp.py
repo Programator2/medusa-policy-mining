@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-from load import load_policy
 from tree import NpmTree
 from sys import argv, stderr, exit
 from policy import create_constable_policy
