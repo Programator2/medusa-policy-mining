@@ -560,7 +560,7 @@ class NpmTree(GenericTree):
         func=print,
         print_callback: Callable[[Node], str] = None,
     ):
-        """Another implementation of printing tree using Stack
+        """Another implementation of printing tree using Stack.
         Print tree structure in hierarchy style.
 
         For example:
