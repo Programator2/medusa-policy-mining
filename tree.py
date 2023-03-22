@@ -471,6 +471,23 @@ class NpmTree(GenericTree):
                                 f"Generalized by write access of files in '{path}' for {access}."
                             )
 
+    def move_generalized_to_regexp(self):
+        """Move information from generalized sets into regexp nodes."""
+        for node in list(self.all_nodes_itr()):
+            if (data := node.data) is None:
+                continue
+            generalized = node.data.generalized
+            if not generalized:
+                continue
+
+            new_data_node = NpmNode(generalized)
+            new_data_node.is_regexp = True
+
+            new_node = self.create_node('.*', parent=node.identifier)
+            new_node.data = new_data_node
+
+            node.data.generalized.clear()
+
     # TODO: override this function without copying so much stuff from the
     # library
     def show(
