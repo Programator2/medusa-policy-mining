@@ -1,4 +1,4 @@
-from enum import Flag, auto
+from enum import Flag, auto, Enum
 
 
 class OwnerGeneralizationStrategy(Flag):
@@ -18,6 +18,17 @@ class OwnerGeneralizationStrategy(Flag):
     OWN_FILES = auto()
     READ_FILES = auto()
     WRITE_FILES = auto()
+
+
+class MultipleRunsSingleton(Enum):
+    """To configure multiple runs generalization."""
+    NO_ACTION = auto()
+    """No generalization will be created."""
+    NUMERICAL_GENERALIZATION = auto()
+    """Numerical part will be regexped."""
+    FULL_GENERALIZATION = auto()
+    """All siblings of the file will be generalized (the same as .* under parent
+    directory)."""
 
 
 GENERALIZE_THRESHOLD = 1.0
@@ -45,3 +56,5 @@ OWNER_GENERALIZATION_STRATEGY = (
     | OwnerGeneralizationStrategy.WRITE_FILES
 )
 """Which generalization strategies will be used for UGO generalization."""
+
+MULTIPLE_RUNS_STRATEGY = MultipleRunsSingleton.NUMERICAL_GENERALIZATION

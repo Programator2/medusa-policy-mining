@@ -5,13 +5,13 @@ from itertools import groupby, chain
 from functools import reduce
 from operator import xor
 from string_grouper import group_similar_strings
-from pandas import Series, DataFrame
-from pprint import pprint
+from pandas import DataFrame
 from diff_match_patch import diff_match_patch as DiffMatchPatch
 from collections.abc import Iterable
 from re import escape, fullmatch
 from collections import Counter
 from copy import deepcopy
+from config import MULTIPLE_RUNS_STRATEGY, MultipleRunsSingleton
 
 
 def regex_from_diff(diff: Iterable[tuple[int, str]]) -> str:
@@ -42,7 +42,57 @@ def regex_from_diff(diff: Iterable[tuple[int, str]]) -> str:
     return regex
 
 
+def _get_numeric_regexp(name: str) -> str:
+    """Replace strings of numeric characters in `name` by unlimited number of
+    decimal regexp characters.
+    """
+    ret = ''
+    in_number = False
+    try:
+        for l in name:
+            if l.isnumeric():
+                in_number = True
+                continue
+            if in_number:
+                ret += r'\d*'
+                in_number = False
+            ret += l
+    except AttributeError:
+        breakpoint()
+    if in_number:
+        ret += r'\d*'
+    return ret
+
+
+def construct_regex_and_delete_originals(all_paths, paths, regex_tree, reg):
+    # 1. Get original accesses and delete them from original tree
+    accesses: set[Access] = set()
+    for row in all_paths:
+        node = None
+        for tree in paths:
+            try:
+                node = tree[row.path]
+            except KeyError:
+                print(f"couldn't find {row.path}")
+                continue
+            if node is None:
+                raise RuntimeError(f'Unexpected: {row.path} not in the tree.')
+            accesses.update(node.data)
+            node.data.clear()
+            break
+
+    # print(f'{accesses=} for {control.path}')
+
+    # 2. Construct a new path with regex
+    node = regex_tree.add_path_generalization(reg)
+
+    # 3. Add access to the new node
+    for access in accesses:
+        node.data.add_access(access)
+
+
 def generalize_mupltiple_runs(db: DatabaseRead, *trees: NpmTree) -> NpmTree:
+
     """Identify unique accesses in multiple runs and try to generalize them
     based on similarity. Permissions that were generalized are removed from the
     input trees and moved into a new regex-only tree.
@@ -91,12 +141,28 @@ def generalize_mupltiple_runs(db: DatabaseRead, *trees: NpmTree) -> NpmTree:
             inplace=True,
         )
 
+        # print(uniq_paths_series)
+
         groups = uniq_paths_series.groupby('group-id')
 
         for name, group in groups:
             # `control` is the "group leader" row of a DataFrame and `others`
             # are rows that belong to this group
             all_paths = list(group.itertuples())
+            if len(all_paths) == 1:
+                # We can't search for difference with just one string
+                match MULTIPLE_RUNS_STRATEGY:
+                    case MultipleRunsSingleton.NUMERICAL_GENERALIZATION:
+                        reg = _get_numeric_regexp(all_paths[0].path)
+                        construct_regex_and_delete_originals(
+                            all_paths, paths, regex_tree, reg
+                        )
+                    case MultipleRunsSingleton.FULL_GENERALIZATION:
+                        reg = '.*'
+                        construct_regex_and_delete_originals(
+                            all_paths, paths, regex_tree, reg
+                        )
+                continue
             control, *others = all_paths
             regexps = []
             # print(f'{control.path=}')
@@ -122,34 +188,14 @@ def generalize_mupltiple_runs(db: DatabaseRead, *trees: NpmTree) -> NpmTree:
                         "Regexp that covers all paths doesn't exist."
                     )
             else:
-                reg = regexps[0]
+                try:
+                    reg = regexps[0]
+                except IndexError:
+                    breakpoint()
 
-            # 1. Get original accesses and delete them from original tree
-            accesses: set[Access] = set()
-            for row in all_paths:
-                node = None
-                for tree in paths:
-                    try:
-                        node = tree[row.path]
-                    except KeyError:
-                        print(f"couldn't find {row.path}")
-                        continue
-                    if node is None:
-                        raise RuntimeError(
-                            f'Unexpected: {row.path} not in the tree.'
-                        )
-                    accesses.update(node.data)
-                    node.data.clear()
-                    break
-
-            # print(f'{accesses=} for {control.path}')
-
-            # 2. Construct a new path with regex
-            node = regex_tree.add_path_generalization(reg)
-
-            # 3. Add access to the new node
-            for access in accesses:
-                node.data.add_access(access)
+            construct_regex_and_delete_originals(
+                all_paths, paths, regex_tree, reg
+            )
 
         # print('=' * 80)
     # regex_tree.show()
@@ -170,7 +216,6 @@ def _check_tree(new_tree: NpmTree, new_node: Node, tree: NpmTree, node: Node):
             # anything
             # TODO: Move permissions
             new_child_node = new_children_tag_to_node[child.tag]
-            pass
         else:
             # Copy `child` to the `new_tree` at the same position
             new_child_node = deepcopy(child)
@@ -179,6 +224,8 @@ def _check_tree(new_tree: NpmTree, new_node: Node, tree: NpmTree, node: Node):
 
 
 def merge_tree(*trees: NpmTree) -> NpmTree:
+    # TODO: Implement cleaning function that removes excess nodes that are
+    # covered by regexes
     new_tree = NpmTree()
     for tree in trees:
         _check_tree(new_tree, new_tree.npm_root, tree, tree.npm_root)
