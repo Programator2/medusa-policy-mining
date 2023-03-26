@@ -19,7 +19,7 @@ from config import (
 )
 import sys
 from copy import copy
-from re import search
+from re import search, fullmatch
 
 
 class Access:
@@ -226,22 +226,8 @@ class NpmTree(GenericTree):
         """Prints access information for a given path.
 
         :param path: Absolute path in a form of /etc/a/b"""
-        entries = filter(lambda x: bool(x), path.split('/'))
-        parent = self.npm_root
-        for e in entries:
-            exists = next(
-                filter(
-                    lambda x: x.tag == e,
-                    (self[y] for y in parent.successors(self.identifier)),
-                ),
-                None,
-            )
-            if exists is not None:
-                parent = exists
-            else:
-                print(f'Path {path} does not exist.')
-                return
-            pprint(parent.data)
+        node = self.get_node_at_path(path)
+        pprint(node.data)
 
     def get_path(self, node: Node) -> str:
         """Print full path for a given node"""
@@ -492,6 +478,46 @@ class NpmTree(GenericTree):
 
             node.data.generalized.clear()
 
+    def test_accesses(self, b, medusa_domains: Iterable):
+        """
+        :param b: Input reference table of accesses.
+        :param medusa_domains: `Iterable` of domains to be checked for.
+        """
+        # This is still a work in progress, but I plan `B` to be an iterable
+        # containing tuples in the form of (path, read, write)
+        results = []
+        for path, read, write in b:
+            node = self.get_node_at_path(
+                path, search_regexp=True, verbose=False
+            )
+            if node is None or not node.data:
+                # Path not found or no permissions for the node
+                results.append((0, 0))
+                continue
+            for access in node.data:
+                if access.domain in medusa_domains:
+                    result = (
+                        1 if access.permissions & Permission.READ else 0,
+                        1 if access.permissions & Permission.WRITE else 0,
+                    )
+                    results.append(result)
+                    continue
+            results.append((0, 0))
+
+        true_positive = 0
+        false_negative = 0
+        true_negative = 0
+        for (_, a, b), (x, y) in zip(b, results):
+            if a == x:
+                true_positive += 1
+            else:
+                false_negative += 1
+            if b == y:
+                true_positive += 1
+            else:
+                false_negative += 1
+        print(f'{true_positive=} {false_negative=}')
+
     # TODO: override this function without copying so much stuff from the
     # library
     def show(
@@ -567,6 +593,59 @@ class NpmTree(GenericTree):
             print(self._reader)
         else:
             return self._reader
+
+    def _find_node_match(
+        self, parent: Node, name: str, search_regexp: bool
+    ) -> Node | Node:
+        """Search a node in `parent` according to `name`.
+
+        :param parent: `Node` (directory) in which to search.
+        :param name: Dentry name to search for.
+        :param search_regexp: Whether to check regexp nodes if direct name was
+        not found.
+        :returns: Matched `Node` or `None`.
+        """
+        if search_regexp:
+            regexps = []
+        # First searching for direct nodes (containing name)
+        for y in parent.successors(self.identifier):
+            node = self[y]
+            if node.data and node.data.is_regexp:
+                if search_regexp:
+                    regexps.append(node)
+                continue
+            if node.tag == name:
+                return node
+        # If not found, try regexps
+        if search_regexp:
+            for y in regexps:
+                if fullmatch(node.tag, name):
+                    return node
+        # Not found
+        return None
+
+    def get_node_at_path(
+        self, path: str, search_regexp: bool = False, verbose=True
+    ) -> Node | None:
+        """Return `Node` at `path`.
+
+        :param path: Absolute path to search in the tree.
+        :param search_regexp: Set to `True` if `get_node_at_path` should return
+        :verbose: `True` by default to detect unexpected behavior.
+        appropriate regexp node if direct node was not found.
+        :returns: `None` if path doesn't exist.
+        """
+        entries = filter(lambda x: bool(x), path.split('/'))
+        parent = self.npm_root
+        for e in entries:
+            exists = self._find_node_match(parent, e, search_regexp)
+            if exists is not None:
+                parent = exists
+            else:
+                if verbose:
+                    print(f'Path {path} does not exist.', file=sys.stderr)
+                return None
+        return parent
 
     def print_backend(
         self,
