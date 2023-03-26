@@ -15,7 +15,7 @@ from config import (
     OwnerGeneralizationStrategy,
     OWNER_GENERALIZATION_STRATEGY,
     GENERALIZE_THRESHOLD,
-    GENERALIZE_FS_THRESHOLD
+    GENERALIZE_FS_THRESHOLD,
 )
 import sys
 from copy import copy
@@ -288,7 +288,9 @@ class NpmTree(GenericTree):
                     is_regexp = False
                 data = NpmNode()
                 data.is_regexp = is_regexp
-                parent = self.create_node(e, parent=parent.identifier, data=data)
+                parent = self.create_node(
+                    e, parent=parent.identifier, data=data
+                )
         # Transfer permission from regexed paths, maybe return and do it in the
         # caller
         return parent
@@ -338,7 +340,9 @@ class NpmTree(GenericTree):
                     node.data = NpmNode()
                 NpmNode.generic_add_access(node.data.generalized, ac := access)
                 if verbose:
-                    print(f'Generalized (from logs) {ac} for {self.get_path(node)}')
+                    print(
+                        f'Generalized (from logs) {ac} for {self.get_path(node)}'
+                    )
 
     def generalize_fs(self, db: DatabaseRead, verbose=False):
         """Same as `generalize`, but with fs database."""
@@ -423,9 +427,9 @@ class NpmTree(GenericTree):
                     & OwnerGeneralizationStrategy.OWN_DIR
                 ):
                     path = self.get_path(node)
-                    if db.is_directory(
+                    if db.is_directory(path) and access.uid == db.get_owner(
                         path
-                    ) and access.uid == db.get_owner(path):
+                    ):
                         data.generalized.add(access)
                         if verbose:
                             print(
