@@ -10,7 +10,8 @@ from more_itertools import first
 from permission import Permission
 from mpm_types import AuditEntry
 from generalize.generalize import generalize_nonexistent
-from fs2json.db import DatabaseRead
+from fs2json.db import DatabaseRead, DatabaseWriter
+
 from config import (
     OwnerGeneralizationStrategy,
     OWNER_GENERALIZATION_STRATEGY,
@@ -20,6 +21,7 @@ from config import (
 import sys
 from copy import copy
 from re import search, fullmatch
+from bitarray import bitarray as Bitarray
 
 
 class Access:
@@ -144,8 +146,8 @@ class NpmNode(set):
 
 
 class GenericTree(Tree):
-    def __init__(self, *args, **kwargs):
-        super().__init__(self, args, kwargs)
+    def __init__(self, tree=None, deep=False):
+        super().__init__(tree, deep)
 
     def _create_path(self, entries: Iterable):
         """Create necessary nodes in the tree to represent a path.
@@ -169,8 +171,8 @@ class GenericTree(Tree):
 
 
 class DomainTree(GenericTree):
-    def __init__(self, *args, **kwargs):
-        super().__init__(self, args, kwargs)
+    def __init__(self, tree=None, deep=False):
+        super().__init__(tree, deep)
         self.npm_root = self.create_node('/', '/')
         self.root = self.npm_root.identifier
 
@@ -184,10 +186,13 @@ class DomainTree(GenericTree):
 
 
 class NpmTree(GenericTree):
-    def __init__(self, *args, **kwargs):
-        super().__init__(self, args, kwargs)
-        self.npm_root = self.create_node('/', '/')
-        self.root = self.npm_root.identifier
+    def __init__(self, tree=None, deep=False):
+        super().__init__(tree, deep)
+        if tree is None:
+            self.npm_root = self.create_node('/', '/')
+            self.root = self.npm_root.identifier
+        else:
+            self.npm_root = self[self.root]
 
     def _create_path(self, path: str) -> Node:
         """Create necessary nodes in the tree to represent a path.
@@ -478,7 +483,7 @@ class NpmTree(GenericTree):
 
             node.data.generalized.clear()
 
-    def test_accesses(self, b, medusa_domains: Iterable):
+    def test_accesses(self, b, medusa_domains: Iterable, verbose: bool = False):
         """
         :param b: Input reference table of accesses.
         :param medusa_domains: `Iterable` of domains to be checked for.
@@ -501,22 +506,69 @@ class NpmTree(GenericTree):
                         1 if access.permissions & Permission.WRITE else 0,
                     )
                     results.append(result)
-                    continue
-            results.append((0, 0))
+                    break
+            else:
+                results.append((0, 0))
 
-        true_positive = 0
-        false_negative = 0
-        true_negative = 0
-        for (_, a, b), (x, y) in zip(b, results):
-            if a == x:
-                true_positive += 1
-            else:
-                false_negative += 1
-            if b == y:
-                true_positive += 1
-            else:
-                false_negative += 1
-        print(f'{true_positive=} {false_negative=}')
+        # true_positive = 0
+        # false_negative = 0
+        # true_negative = 0
+        print(len(b), len(results))
+        assert len(b) == len(results)
+
+        reference_results = Bitarray((read for _, read, _ in b))
+        reference_results.extend((write for _, _, write in b))
+
+        medusa_results = Bitarray((read for read, _ in results))
+        medusa_results.extend((write for _, write in results))
+
+        tp = (reference_results & medusa_results).count()
+        tn = (~reference_results & ~medusa_results).count()
+        overpermission = (~reference_results & medusa_results).count()
+        underpermission = (reference_results & ~medusa_results).count()
+
+        return (tp, underpermission, overpermission, tn)
+
+    def insert_medusa_accesses(
+        self,
+        db: DatabaseWriter,
+        case: str,
+        subject_context: str,
+        medusa_domains: set[tuple[tuple]],
+    ) -> None:
+        """Insert Medusa accesses into accesses table."""
+        case_id = db.get_case_id(case)
+        subject_cid = db.get_context_id(subject_context)
+
+        for node in self.all_nodes_itr():
+            if not (data := node.data):
+                continue
+            # TODO: Linear search bottleneck
+            permissions = Permission(0)
+            for access in data:
+                if access.domain in medusa_domains:
+                    # Add all permissions together
+                    # This lowers the precision, but it's impossible to compare
+                    # multiple domains with just one reference domain
+                    permissions |= access.permissions
+
+            # Get all path_rowids that apply to this node
+            path_rowids = self.node_to_db_paths(db, node)
+
+            # This needs to go into a loop
+            for path_rowid in path_rowids:
+                print(f'inserting {path_rowid} {node.tag}')
+                access_id = db.insert_or_select_access(
+                    case_id, subject_cid, path_rowid
+                )
+                perms = ('read', 'write')
+                perms_id = db.get_operations_id(perms)
+                results = (
+                    permissions & Permission.READ,
+                    permissions & Permission.WRITE,
+                )
+                for perm_id, result in zip(perms_id, results):
+                    db.insert_result(access_id, perm_id, None, result)
 
     # TODO: override this function without copying so much stuff from the
     # library
@@ -646,6 +698,57 @@ class NpmTree(GenericTree):
                     print(f'Path {path} does not exist.', file=sys.stderr)
                 return None
         return parent
+
+    @staticmethod
+    def _node_to_db_paths(
+        db: DatabaseWriter, nodes: Iterable[Node], parent: int
+    ) -> list[int]:
+        """Recursively find paths according to nodes.
+
+        :param db: Database
+        :param nodes: List of `Node` objects in the tree that needs to be
+        extracted from the file database.
+        :param parent: Rowid of parent darectore where the `nodes[0]` will be
+        searched.
+        """
+        if not nodes:
+            # Final component, this should be returned
+            return [parent]
+
+        node = nodes[0]
+        is_regexp = False
+        if node.data:
+            is_regexp = node.data.is_regexp
+
+        # Handle straight literal node
+        if not is_regexp:
+            child = db.get_specific_child(parent, node.tag)
+            if child is None:
+                return []
+            return NpmTree._node_to_db_paths(db, nodes[1:], child)
+
+        # Handle regexp node
+        ret = []
+        children = db.get_children(parent)
+        children = [
+            a[0] for a in filter(lambda x: fullmatch(node.tag, x[1]), children)
+        ]
+
+        for child in children:
+            ret.append(NpmTree._node_to_db_paths(db, nodes[1:], child))
+
+        return ret
+
+    def node_to_db_paths(self, db: DatabaseWriter, node: Node) -> list[int]:
+        """Convert node to a list of path rowids from the database.
+
+        If path to node in the tree contains regexps, they will be used to cover
+        matching paths in the database. All matching paths will be returned.
+        """
+        nodes = [self[nid] for nid in self.rsearch(node.identifier)]
+        nodes.reverse()
+        assert nodes[0].tag == '/'
+        return self._node_to_db_paths(db, nodes[1:], 1)
 
     def print_backend(
         self,
