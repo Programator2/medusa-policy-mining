@@ -671,8 +671,8 @@ class NpmTree(GenericTree):
         # If not found, try regexps
         if search_regexp:
             for y in regexps:
-                if fullmatch(node.tag, name):
-                    return node
+                if fullmatch(y.tag, name):
+                    return y
         # Not found
         return None
 
