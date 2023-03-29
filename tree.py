@@ -99,6 +99,10 @@ class NpmNode(set):
         # Nodes represented by a regexp set this to `True`
         self.is_regexp = False
 
+        # If `True`, then `Access` objects in this node apply to *this* node and
+        # all *children* nodes.
+        self.is_recursive = False
+
         if args is not None:
             self.update(args)
 
@@ -564,11 +568,128 @@ class NpmTree(GenericTree):
                 perms = ('read', 'write')
                 perms_id = db.get_operations_id(perms)
                 results = (
-                    permissions & Permission.READ,
-                    permissions & Permission.WRITE,
+                    1 if permissions & Permission.READ else 0,
+                    1 if permissions & Permission.WRITE else 0,
                 )
                 for perm_id, result in zip(perms_id, results):
                     db.insert_result(access_id, perm_id, None, result)
+
+    def fill_missing_medusa_accesses(
+        self,
+        db: DatabaseWriter,
+        case: str,
+        subject_context: str,
+        medusa_domains: set[tuple[tuple]],
+    ) -> None:
+        """Insert Medusa accesses into accesses table."""
+        case_id = db.get_case_id(case)
+        subject_cid = db.get_context_id(subject_context)
+        perms = ('read', 'write')
+        perms_id = db.get_operations_id(perms)
+        res = db.cur.execute(
+            """WITH RECURSIVE child AS
+  (SELECT accesses.rowid AS access_rowid,
+          accesses.node_rowid,
+          accesses.subject_cid,
+          contexts.name AS subject_context,
+          fs.rowid,
+          fs.parent,
+          fs.name,
+          type,
+          fs.selinux_user,
+          fs.selinux_role,
+          fs.selinux_type,
+          fs.selinux_category,
+          fs.selinux_sensitivity,
+          operations.rowid AS operation_id,
+          operation,
+          results.reference_result,
+          results.medusa_result
+   FROM accesses
+   JOIN contexts ON subject_cid = contexts.rowid
+   JOIN fs ON node_rowid = fs.rowid
+   LEFT JOIN results ON accesses.ROWID = results.access_id
+   LEFT JOIN operations ON results.operation_id = operations.rowid
+   WHERE case_id = 1
+     AND medusa_result IS NULL
+   UNION ALL SELECT access_rowid,
+                    node_rowid,
+                    subject_cid,
+                    subject_context,
+                    fs.rowid,
+                    fs.parent,
+                    fs.name || '/' || child.name,
+                    child.type,
+                    child.selinux_user,
+                    child.selinux_role,
+                    child.selinux_type,
+                    child.selinux_category,
+                    child.selinux_sensitivity,
+                    operation_id,
+                    operation,
+                    reference_result,
+                    medusa_result
+   FROM fs,
+        child
+   WHERE child.parent = fs.rowid )
+SELECT access_rowid,
+       subject_cid,
+       subject_context,
+       node_rowid,
+       name AS path,
+       TYPE,
+       selinux_user || ':' || selinux_role || ':' || selinux_type || ':' || selinux_sensitivity || COALESCE(':' || selinux_category, '') AS selinux_context,
+       operation_id,
+       operation,
+       reference_result,
+       medusa_result
+FROM child
+WHERE rowid = 1
+        """
+        )
+        accesses = res.fetchall()
+        for (
+            access_id,
+            subject_cid,
+            subject_context,
+            path_rowid,
+            path,
+            _type,
+            selinux_context,
+            operation_id,
+            operation,
+            reference_result,
+            medusa_result,
+        ) in accesses:
+
+            # Get node applicable for this path
+            node = self.get_node_at_path(path, True, True, True)
+
+            if node is None or not (data := node.data):
+                # TODO: What if it's a visited folder??? Needs to have at least
+                # read.
+                #
+                # Permission not allowed
+                for perm_id, result in zip(perms_id, (0, 0)):
+                    db.insert_result(access_id, perm_id, None, result)
+                continue
+
+            # TODO: Linear search bottleneck
+            permissions = Permission(0)
+            for access in data:
+                if access.domain in medusa_domains:
+                    # Add all permissions together
+                    # This lowers the precision, but it's impossible to compare
+                    # multiple domains with just one reference domain
+                    permissions |= access.permissions
+
+            print(f'inserting {path_rowid} {node.tag}')
+            results = (
+                1 if permissions & Permission.READ else 0,
+                1 if permissions & Permission.WRITE else 0,
+            )
+            for perm_id, result in zip(perms_id, results):
+                db.insert_result(access_id, perm_id, None, result)
 
     # TODO: override this function without copying so much stuff from the
     # library
@@ -647,7 +768,11 @@ class NpmTree(GenericTree):
             return self._reader
 
     def _find_node_match(
-        self, parent: Node, name: str, search_regexp: bool
+        self,
+        parent: Node,
+        name: str,
+        search_regexp: bool,
+        search_recursive: bool,
     ) -> Node | Node:
         """Search a node in `parent` according to `name`.
 
@@ -658,7 +783,7 @@ class NpmTree(GenericTree):
         :returns: Matched `Node` or `None`.
         """
         if search_regexp:
-            regexps = []
+            regexps: list[Node] = []
         # First searching for direct nodes (containing name)
         for y in parent.successors(self.identifier):
             node = self[y]
@@ -673,11 +798,18 @@ class NpmTree(GenericTree):
             for y in regexps:
                 if fullmatch(y.tag, name):
                     return y
+        # Is parent a recursive node?
+        if parent.data and parent.data.is_recursive:
+            return parent
         # Not found
         return None
 
     def get_node_at_path(
-        self, path: str, search_regexp: bool = False, verbose=True
+        self,
+        path: str,
+        search_regexp: bool = False,
+        verbose=True,
+        search_recursive: bool = False,
     ) -> Node | None:
         """Return `Node` at `path`.
 
@@ -690,8 +822,13 @@ class NpmTree(GenericTree):
         entries = filter(lambda x: bool(x), path.split('/'))
         parent = self.npm_root
         for e in entries:
-            exists = self._find_node_match(parent, e, search_regexp)
+            exists = self._find_node_match(
+                parent, e, search_regexp, search_recursive
+            )
             if exists is not None:
+                # Short-circuit for recursive nodes
+                if exists is parent:
+                    return parent
                 parent = exists
             else:
                 if verbose:
