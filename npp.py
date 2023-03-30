@@ -12,19 +12,20 @@ from more_itertools import split_at
 
 def main():
     if len(argv) < 2:
-        print("""Usage: npp.py <service1-log1> ... [--] <service2-log1> ...
+        print(
+            f"""Usage: {argv[0]} <service1-log1> ... [--] <service2-log1> ...
 
 Logs from different services should be split using `--`. Multiple runs of the
-same service can be specified without the splitter.""", file=stderr)
+same service can be specified without the splitter.""",
+            file=stderr,
+        )
         return -1
     args = argv[1:]
     runs = list(split_at(args, lambda x: x == '--'))
     max_runs = max(len(run) for run in runs)
     trees: list[NpmTree] = []
     domain_trees: list[DomainTree] = []
-    domain_transitions: list[
-        dict[tuple[tuple, str, Any], tuple]
-    ] = []
+    domain_transitions: list[dict[tuple[tuple, str, Any], tuple]] = []
     for i in range(max_runs):
         trees.append(NpmTree())
         domain_trees.append(DomainTree())
