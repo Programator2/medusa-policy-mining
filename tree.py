@@ -537,12 +537,25 @@ class NpmTree(GenericTree):
         self,
         db: DatabaseWriter,
         case: str,
+        eval_case: str,
         subject_context: str,
         medusa_domains: set[tuple[tuple]],
     ) -> None:
-        """Insert Medusa accesses into accesses table."""
+        """Insert Medusa accesses into accesses table.
+
+        :param db: Database that's used to read and write the accesses.
+        :param case: Name of the case for this *service*.
+        :param eval_case: Name of the evaluation case for this *generalization
+        algorithm*. There are multiple evaluation cases for one service case.
+        :param subject_context: Reference security module subject context of the
+        service.
+        :param medusa_domains: Domains that will be used to determine access. If
+        *at least one* domain enables the operation, the access is considered
+        allowed.
+        """
         case_id = db.get_case_id(case)
         subject_cid = db.get_context_id(subject_context)
+        eval_case_id = db.insert_or_select_eval_case(eval_case)
 
         for node in self.all_nodes_itr():
             if not (data := node.data):
@@ -572,20 +585,35 @@ class NpmTree(GenericTree):
                     1 if permissions & Permission.WRITE else 0,
                 )
                 for perm_id, result in zip(perms_id, results):
-                    db.insert_result(access_id, perm_id, None, result)
+                    db.insert_result(
+                        access_id, perm_id, None, eval_case_id, result
+                    )
 
     def fill_missing_medusa_accesses(
         self,
         db: DatabaseWriter,
         case: str,
+        eval_case: str,
         subject_context: str,
         medusa_domains: set[tuple[tuple]],
     ) -> None:
-        """Insert Medusa accesses into accesses table."""
+        """Insert Medusa accesses into accesses table.
+
+        :param db: Database that's used to read and write the accesses.
+        :param case: Name of the case for this *service*.
+        :param eval_case: Name of the evaluation case for this *generalization
+        algorithm*. There are multiple evaluation cases for one service case.
+        :param subject_context: Reference security module subject context of the
+        service.
+        :param medusa_domains: Domains that will be used to determine access. If
+        *at least one* domain enables the operation, the access is considered
+        allowed.
+        """
         case_id = db.get_case_id(case)
         subject_cid = db.get_context_id(subject_context)
         perms = ('read', 'write')
         perms_id = db.get_operations_id(perms)
+        eval_case_id = db.insert_or_select_eval_case(eval_case)
         res = db.cur.execute(
             """WITH RECURSIVE child AS
   (SELECT accesses.rowid AS access_rowid,
@@ -604,12 +632,13 @@ class NpmTree(GenericTree):
           operations.rowid AS operation_id,
           operation,
           results.reference_result,
-          results.medusa_result
+          medusa_results.medusa_result
    FROM accesses
    JOIN contexts ON subject_cid = contexts.rowid
    JOIN fs ON node_rowid = fs.rowid
    LEFT JOIN results ON accesses.ROWID = results.access_id
    LEFT JOIN operations ON results.operation_id = operations.rowid
+   LEFT JOIN medusa_results ON results.rowid = medusa_results.result_id
    WHERE case_id = 1
      AND medusa_result IS NULL
    UNION ALL SELECT access_rowid,
@@ -671,7 +700,9 @@ WHERE rowid = 1
                 #
                 # Permission not allowed
                 for perm_id, result in zip(perms_id, (0, 0)):
-                    db.insert_result(access_id, perm_id, None, result)
+                    db.insert_result(
+                        access_id, perm_id, None, eval_case_id, result
+                    )
                 continue
 
             # TODO: Linear search bottleneck
@@ -689,7 +720,7 @@ WHERE rowid = 1
                 1 if permissions & Permission.WRITE else 0,
             )
             for perm_id, result in zip(perms_id, results):
-                db.insert_result(access_id, perm_id, None, result)
+                db.insert_result(access_id, perm_id, None, eval_case_id, result)
 
     # TODO: override this function without copying so much stuff from the
     # library
