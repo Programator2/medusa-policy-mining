@@ -7,12 +7,12 @@ from collections import UserList, Counter
 from pprint import pprint
 from collections.abc import Iterable
 from more_itertools import first
-from permission import Permission
-from mpm_types import AuditEntry
-from generalize.generalize import generalize_nonexistent
+from mpm.permission import Permission
+from mpm.mpm_types import AuditEntry
+from mpm.generalize.generalize import generalize_nonexistent
 from fs2json.db import DatabaseRead, DatabaseWriter
 
-from config import (
+from mpm.config import (
     OwnerGeneralizationStrategy,
     OWNER_GENERALIZATION_STRATEGY,
     GENERALIZE_THRESHOLD,

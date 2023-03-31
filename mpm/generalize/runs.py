@@ -1,5 +1,5 @@
 from fs2json.db import DatabaseRead
-from tree import NpmTree
+from mpm.tree import NpmTree
 from treelib import Node
 from itertools import groupby, chain
 from functools import reduce
@@ -11,7 +11,7 @@ from collections.abc import Iterable
 from re import escape, fullmatch
 from collections import Counter
 from copy import deepcopy
-from config import MULTIPLE_RUNS_STRATEGY, MultipleRunsSingleton
+from mpm.config import MULTIPLE_RUNS_STRATEGY, MultipleRunsSingleton
 
 
 def regex_from_diff(diff: Iterable[tuple[int, str]]) -> str:

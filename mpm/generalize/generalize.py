@@ -1,8 +1,7 @@
 import re
-from utils import path_components
 from pathlib import PurePosixPath
 from fs2json.db import DatabaseRead
-from config import GENERALIZE_PROC
+from mpm.config import GENERALIZE_PROC
 
 
 def generalize_proc(path: str) -> str:

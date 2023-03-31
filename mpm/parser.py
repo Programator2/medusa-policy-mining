@@ -3,11 +3,11 @@
 
 from collections import defaultdict
 from itertools import takewhile, groupby
-from permission import Permission
+from mpm.permission import Permission
 from pprint import pprint
 from treelib import Tree
-from tree import DomainTree
-from mpm_types import PathAccess, AuditLogRaw, AuditEntry
+from mpm.tree import DomainTree
+from mpm.mpm_types import PathAccess, AuditLogRaw, AuditEntry
 from typing import DefaultDict, TypeVar, Any, Iterable, Mapping
 
 

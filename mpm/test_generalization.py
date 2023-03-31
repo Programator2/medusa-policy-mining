@@ -1,5 +1,5 @@
 import unittest
-from generalize import generalize, runs
+from mpm.generalize import generalize, runs
 
 
 class TestProcGeneralization(unittest.TestCase):

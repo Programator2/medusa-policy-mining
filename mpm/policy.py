@@ -1,9 +1,9 @@
-from tree import NpmTree, Access, Permission
+from mpm.tree import NpmTree, Access, Permission
 from collections import UserDict, defaultdict
 from itertools import count
 from pprint import pprint
 from typing import DefaultDict, Any
-from generalize.generalize import generalize_proc
+from mpm.generalize.generalize import generalize_proc
 
 STANDARD_TREES = """tree "fs" clone of file by getfile getfile.filename;
 primary tree "fs";
