@@ -538,7 +538,7 @@ class NpmTree(GenericTree):
         db: DatabaseWriter,
         case: str,
         eval_case: str,
-        subject_context: str,
+        subject_contexts: Iterable[str],
         medusa_domains: set[tuple[tuple]],
     ) -> None:
         """Insert Medusa accesses into accesses table.
@@ -554,8 +554,13 @@ class NpmTree(GenericTree):
         allowed.
         """
         case_id = db.get_case_id(case)
-        subject_cid = db.get_context_id(subject_context)
+        subject_cids = [
+            db.get_context_id(subject_context)
+            for subject_context in subject_contexts
+        ]
         eval_case_id = db.insert_or_select_eval_case(eval_case)
+        perms = ('read', 'write')
+        perms_id = db.get_operations_id(perms)
 
         for node in self.all_nodes_itr():
             if not (data := node.data):
@@ -575,26 +580,25 @@ class NpmTree(GenericTree):
             # This needs to go into a loop
             for path_rowid in path_rowids:
                 print(f'inserting {path_rowid} {node.tag}')
-                access_id = db.insert_or_select_access(
-                    case_id, subject_cid, path_rowid
-                )
-                perms = ('read', 'write')
-                perms_id = db.get_operations_id(perms)
                 results = (
                     1 if permissions & Permission.READ else 0,
                     1 if permissions & Permission.WRITE else 0,
                 )
-                for perm_id, result in zip(perms_id, results):
-                    db.insert_result(
-                        access_id, perm_id, None, eval_case_id, result
+                for subject_cid in subject_cids:
+                    access_id = db.insert_or_select_access(
+                        case_id, subject_cid, path_rowid
                     )
+                    for perm_id, result in zip(perms_id, results):
+                        db.insert_result(
+                            access_id, perm_id, None, eval_case_id, result
+                        )
 
     def fill_missing_medusa_accesses(
         self,
         db: DatabaseWriter,
         case: str,
         eval_case: str,
-        subject_context: str,
+        subject_contexts: Iterable[str],
         medusa_domains: set[tuple[tuple]],
     ) -> None:
         """Insert Medusa accesses into accesses table.
@@ -610,12 +614,15 @@ class NpmTree(GenericTree):
         allowed.
         """
         case_id = db.get_case_id(case)
-        subject_cid = db.get_context_id(subject_context)
+        subject_cids = [
+            db.get_context_id(subject_context)
+            for subject_context in subject_contexts
+        ]
         perms = ('read', 'write')
         perms_id = db.get_operations_id(perms)
         eval_case_id = db.insert_or_select_eval_case(eval_case)
         res = db.cur.execute(
-            """WITH RECURSIVE child AS
+            f"""WITH RECURSIVE child AS
   (SELECT accesses.rowid AS access_rowid,
           accesses.node_rowid,
           accesses.subject_cid,
@@ -639,7 +646,8 @@ class NpmTree(GenericTree):
    LEFT JOIN results ON accesses.ROWID = results.access_id
    LEFT JOIN operations ON results.operation_id = operations.rowid
    LEFT JOIN medusa_results ON results.rowid = medusa_results.result_id
-   WHERE case_id = 1
+   WHERE case_id = ?
+     AND subject_cid IN ({'.'.join(subject_cids)})
      AND medusa_result IS NULL
    UNION ALL SELECT access_rowid,
                     node_rowid,
@@ -674,7 +682,8 @@ SELECT access_rowid,
        medusa_result
 FROM child
 WHERE rowid = 1
-        """
+        """,
+            (case_id,),
         )
         accesses = res.fetchall()
         for (
@@ -692,7 +701,9 @@ WHERE rowid = 1
         ) in accesses:
 
             # Get node applicable for this path
-            node = self.get_node_at_path(path, True, True, True)
+            node = self.get_node_at_path(
+                path, search_regexp=True, verbose=True, search_recursive=True
+            )
 
             if node is None or not (data := node.data):
                 # TODO: What if it's a visited folder??? Needs to have at least
@@ -714,7 +725,7 @@ WHERE rowid = 1
                     # multiple domains with just one reference domain
                     permissions |= access.permissions
 
-            print(f'inserting {path_rowid} {node.tag}')
+            # print(f'inserting {path_rowid} {node.tag}')
             results = (
                 1 if permissions & Permission.READ else 0,
                 1 if permissions & Permission.WRITE else 0,
