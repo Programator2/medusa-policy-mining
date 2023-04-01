@@ -647,7 +647,7 @@ class NpmTree(GenericTree):
    LEFT JOIN operations ON results.operation_id = operations.rowid
    LEFT JOIN medusa_results ON results.rowid = medusa_results.result_id
    WHERE case_id = ?
-     AND subject_cid IN ({'.'.join(subject_cids)})
+     AND subject_cid IN ({','.join(str(x) for x in subject_cids)})
      AND medusa_result IS NULL
    UNION ALL SELECT access_rowid,
                     node_rowid,
@@ -914,7 +914,7 @@ WHERE rowid = 1
         ]
 
         for child in children:
-            ret.append(NpmTree._node_to_db_paths(db, nodes[1:], child))
+            ret.extend(NpmTree._node_to_db_paths(db, nodes[1:], child))
 
         return ret
 
