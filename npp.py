@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-from tree import NpmTree
+from mpm.tree import NpmTree, DomainTree
 from sys import argv, stderr, exit
-from policy import create_constable_policy
-from parser import parse_log
-from tree import DomainTree
+from mpm.policy import create_constable_policy
+from mpm.parser import parse_log
 from pprint import pprint
-from fs2json.db import DatabaseRead
-from generalize.runs import generalize_mupltiple_runs, merge_tree
+from fs2json.db import DatabaseWriter
 from more_itertools import split_at
+import mpm.contexts
+import mpm.test_cases
 
 
 def main():
@@ -36,24 +36,37 @@ same service can be specified without the splitter.""",
         0
     ]
 
-    db = DatabaseRead('fs.db')
-
     for logs in runs:
         for i, log_path in enumerate(logs):
             log = parse_log(log_path, domain_trees[i], domain_transitions[i])
             trees[i].load_log(log)
 
+    trees[0].move_generalized_to_regexp()
 
-    # tree.generalize(trees[0].get_node(tree.root), verbose=True)
-    tree.generalize_nonexistent(db, verbose=True)
-    tree.show()
-    # tree.generalize_by_owner(db, verbose=True)
+    db = DatabaseWriter('fs.db')
 
-    regex_tree = generalize_mupltiple_runs(db, *trees)
-    new_tree = merge_tree(*trees)
-    # policy = create_constable_policy(tree, domain_transition)
-    # print(policy)
-    new_tree.show()
+    case = 'postgresql1'
+    print(
+        db.get_permission_confusion(
+            case, mpm.contexts.subjects.POSTGRESQL, 'test1'
+        )
+    )
+
+    print(
+        mpm.test_cases.generalize.test(
+            trees[0],
+            'postgresql1',
+            'test1',
+            mpm.contexts.subjects.POSTGRESQL,
+            mpm.contexts.objects.POSTGRESQL,
+            domain_transitions[0].values(),
+            db,
+        )
+    )
+    db.close()
+
+    return 0
+
     db.close()
     return 0
 
