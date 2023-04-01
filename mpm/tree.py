@@ -579,7 +579,7 @@ class NpmTree(GenericTree):
 
             # This needs to go into a loop
             for path_rowid in path_rowids:
-                print(f'inserting {path_rowid} {node.tag}')
+                # print(f'inserting {path_rowid} {node.tag}')
                 results = (
                     1 if permissions & Permission.READ else 0,
                     1 if permissions & Permission.WRITE else 0,
@@ -702,7 +702,7 @@ WHERE rowid = 1
 
             # Get node applicable for this path
             node = self.get_node_at_path(
-                path, search_regexp=True, verbose=True, search_recursive=True
+                path, search_regexp=True, verbose=False, search_recursive=True
             )
 
             if node is None or not (data := node.data):
