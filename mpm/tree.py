@@ -436,7 +436,7 @@ class NpmTree(GenericTree):
                 ):
                     if self.all_if_any(
                         access.uid == inode.uid
-                        for inode in db.get_children(self.get_path(node))
+                        for inode in db.get_children_inodes(self.get_path(node))
                     ):
                         data.generalized.add(access)
                         if verbose:
@@ -449,7 +449,7 @@ class NpmTree(GenericTree):
                 ):
                     if self.all_if_any(
                         db.can_read(ino, access.uid)
-                        for ino in db.get_children(self.get_path(node))
+                        for ino in db.get_children_inodes(self.get_path(node))
                     ):
                         data.generalized.add(access)
                         if verbose:
@@ -462,7 +462,7 @@ class NpmTree(GenericTree):
                 ):
                     if self.all_if_any(
                         db.can_write(ino, access.uid)
-                        for ino in db.get_children(self.get_path(node))
+                        for ino in db.get_children_inodes(self.get_path(node))
                     ):
                         data.generalized.add(access)
                         if verbose:
@@ -908,7 +908,7 @@ WHERE rowid = 1
 
         # Handle regexp node
         ret = []
-        children = db.get_children(parent)
+        children = db.get_children_rowids_and_names(parent)
         children = [
             a[0] for a in filter(lambda x: fullmatch(node.tag, x[1]), children)
         ]
