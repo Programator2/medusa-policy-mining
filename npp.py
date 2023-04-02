@@ -46,28 +46,57 @@ same service can be specified without the splitter.""",
     db = DatabaseWriter('fs.db')
 
     case = 'postgresql1'
-    print(
-        db.get_permission_confusion(
-            case, mpm.contexts.subjects.POSTGRESQL, 'test1'
-        )
-    )
+    results = {}
 
-    print(
+    results['standard generalization'] = (
         mpm.test_cases.generalize.test(
             trees[0],
             'postgresql1',
-            'test1',
+            'standard generalization',
             mpm.contexts.subjects.POSTGRESQL,
             mpm.contexts.objects.POSTGRESQL,
             domain_transitions[0].values(),
             db,
         )
     )
+    results['by owner'] = (
+        mpm.test_cases.generalize_by_owner.test(
+            trees[0],
+            'postgresql1',
+            'by owner',
+            mpm.contexts.subjects.POSTGRESQL,
+            mpm.contexts.objects.POSTGRESQL,
+            domain_transitions[0].values(),
+            db,
+        )
+    )
+    results['nonexistent'] = (
+        mpm.test_cases.generalize_nonexistent.test(
+            trees[0],
+            'postgresql1',
+            'nonexistent',
+            mpm.contexts.subjects.POSTGRESQL,
+            mpm.contexts.objects.POSTGRESQL,
+            domain_transitions[0].values(),
+            db,
+        )
+    )
+    results['multiple'] = (
+        mpm.test_cases.generalize_multiple_runs.test(
+            trees,
+            'postgresql1',
+            'multiple',
+            mpm.contexts.subjects.POSTGRESQL,
+            mpm.contexts.objects.POSTGRESQL,
+            domain_transitions[0].values(),
+            db,
+        )
+    )
+
     db.close()
 
-    return 0
+    pprint(results)
 
-    db.close()
     return 0
 
 
