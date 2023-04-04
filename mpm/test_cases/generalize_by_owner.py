@@ -1,7 +1,7 @@
 from mpm.tree import NpmTree
 from fs2json.db import DatabaseWriter
 from collections.abc import Iterable
-from mpm.test_cases.helpers import populate_accesses
+from mpm.test_cases.helpers import populate_accesses, export_results
 
 
 def test(
@@ -14,8 +14,11 @@ def test(
     db: DatabaseWriter
 ):
     tree = NpmTree(tree=tree, deep=True)
+    tree.show()
+    print('-'*80)
     tree.generalize_by_owner(db, verbose=True)
     tree.move_generalized_to_regexp()
+    tree.show()
     populate_accesses(
         tree,
         db,
@@ -25,4 +28,5 @@ def test(
         object_types,
         medusa_domains,
     )
+    export_results(case_name, eval_case, subject_contexts, db)
     return db.get_permission_confusion(case_name, subject_contexts, eval_case)

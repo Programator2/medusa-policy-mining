@@ -3,6 +3,7 @@
 from fs2json.db import DatabaseWriter
 from collections.abc import Iterable
 from mpm.tree import NpmTree
+from pathlib import Path
 
 
 def populate_accesses(
@@ -41,3 +42,21 @@ def populate_accesses(
         subject_contexts,
         medusa_domains,
     )
+
+
+def export_results(
+    case_name: str,
+    eval_case: str,
+    subject_contexts: Iterable[str],
+    db: DatabaseWriter,
+):
+    result_dir = Path(f'results/{case_name}/{eval_case}')
+    result_dir.mkdir(parents=True, exist_ok=True)
+    with open(result_dir / 'undepermission', 'w') as f:
+        db.print_confusion(
+            case_name, subject_contexts, eval_case, 'underpermission', f
+        )
+    with open(result_dir / 'overpermission', 'w') as f:
+        db.print_confusion(
+            case_name, subject_contexts, eval_case, 'overpermission', f
+        )
