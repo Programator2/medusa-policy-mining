@@ -645,9 +645,11 @@ class NpmTree(GenericTree):
    JOIN fs ON node_rowid = fs.rowid
    LEFT JOIN results ON accesses.ROWID = results.access_id
    LEFT JOIN operations ON results.operation_id = operations.rowid
-   LEFT JOIN medusa_results ON results.rowid = medusa_results.result_id
+   JOIN eval_cases
+   LEFT JOIN medusa_results ON results.rowid = medusa_results.result_id AND eval_cases.rowid = medusa_results.eval_case_id
    WHERE case_id = ?
      AND subject_cid IN ({','.join(str(x) for x in subject_cids)})
+     AND eval_cases.rowid = ?
      AND medusa_result IS NULL
    UNION ALL SELECT access_rowid,
                     node_rowid,
@@ -683,7 +685,7 @@ SELECT access_rowid,
 FROM child
 WHERE rowid = 1
         """,
-            (case_id,),
+            (case_id, eval_case_id),
         )
         accesses = res.fetchall()
         for (
