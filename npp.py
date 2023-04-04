@@ -70,6 +70,19 @@ same service can be specified without the splitter.""",
             db,
         )
     )
+    results['by owner directory'] = (
+        mpm.test_cases.generalize_by_owner_directory.test(
+            trees[0],
+            'postgresql1',
+            'by owner directory',
+            mpm.contexts.subjects.POSTGRESQL,
+            mpm.contexts.objects.POSTGRESQL,
+            domain_transitions[0].values(),
+            db,
+            [db.get_uid_from_name('postgres')],
+            []
+        )
+    )
     results['nonexistent'] = (
         mpm.test_cases.generalize_nonexistent.test(
             trees[0],

@@ -10,6 +10,7 @@ from more_itertools import first
 from mpm.permission import Permission
 from mpm.mpm_types import AuditEntry
 from mpm.generalize.generalize import generalize_nonexistent
+from mpm.domain import get_current_euid
 from fs2json.db import DatabaseRead, DatabaseWriter
 
 from mpm.config import (
@@ -25,7 +26,7 @@ from bitarray import bitarray as Bitarray
 
 
 class Access:
-    """Represents an access by some proces. Stored inside NpmNode"""
+    """Represents an access by some process. Stored inside NpmNode"""
 
     def __init__(self, permissions: Permission):
         self.permissions = permissions
@@ -469,6 +470,38 @@ class NpmTree(GenericTree):
                             print(
                                 f"Generalized by write access of files in '{path}' for {access}."
                             )
+
+    def generalize_by_owner_directory(
+        self,
+        db: DatabaseRead,
+        medusa_domains: Iterable[tuple[tuple]],
+        uids: Iterable[int] = [],
+        gids: Iterable[int] = [],
+        verbose: bool = False,
+    ):
+        """Generalize directories by searching uids and gids.
+
+        Database `db` will be searched for directories that match `uids` OR
+        `gids`. Directories that match will have `.*` rule inserted under them.
+        """
+        dirs = db.get_directories_by_id(uids, gids)
+        for (path, mode) in dirs:
+            if verbose:
+                print(f'Generalizing by owner directory: {path}')
+            node = self.get_node_at_path(path)
+            if node is None:
+                node = self._create_path(path)
+
+            regex_node = NpmNode()
+            regex_node.is_regexp = True
+
+            regex_tree_node = self.create_node('.*', parent=node, data=regex_node)
+
+            for domain in medusa_domains:
+                a = Access(Permission.READ | Permission.WRITE)
+                a.domain = domain
+                a.uid = get_current_euid(domain)
+                regex_node.add(a)
 
     def move_generalized_to_regexp(self):
         """Move information from generalized sets into regexp nodes."""
