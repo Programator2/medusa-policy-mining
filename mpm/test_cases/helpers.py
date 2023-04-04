@@ -49,14 +49,26 @@ def export_results(
     eval_case: str,
     subject_contexts: Iterable[str],
     db: DatabaseWriter,
+    tree: NpmTree = None,
 ):
     result_dir = Path(f'results/{case_name}/{eval_case}')
     result_dir.mkdir(parents=True, exist_ok=True)
-    with open(result_dir / 'undepermission', 'w') as f:
+    with open(result_dir / 'hit.txt', 'w') as f:
+        db.print_confusion(
+            case_name, subject_contexts, eval_case, 'hit', f
+        )
+    with open(result_dir / 'correct_denial.txt', 'w') as f:
+        db.print_confusion(
+            case_name, subject_contexts, eval_case, 'correct denial', f
+        )
+    with open(result_dir / 'undepermission.txt', 'w') as f:
         db.print_confusion(
             case_name, subject_contexts, eval_case, 'underpermission', f
         )
-    with open(result_dir / 'overpermission', 'w') as f:
+    with open(result_dir / 'overpermission.txt', 'w') as f:
         db.print_confusion(
             case_name, subject_contexts, eval_case, 'overpermission', f
         )
+    if tree is not None:
+        with open(result_dir / 'tree.txt', 'w') as f:
+            f.write(tree.show(stdout=False))

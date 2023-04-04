@@ -27,5 +27,5 @@ def test(
         object_types,
         medusa_domains,
     )
-    export_results(case_name, eval_case, subject_contexts, db)
+    export_results(case_name, eval_case, subject_contexts, db, tree)
     return db.get_permission_confusion(case_name, subject_contexts, eval_case)
