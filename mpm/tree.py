@@ -2,7 +2,7 @@
 from treelib import Tree
 from treelib.exceptions import NodeIDAbsentError
 from treelib.node import Node
-from typing import Callable
+from typing import Callable, Self
 from collections import UserList, Counter
 from pprint import pprint
 from collections.abc import Iterable
@@ -145,6 +145,15 @@ class NpmNode(set):
         `READ|WRITE`.
         """
         self.generic_add_access(self, access)
+
+    def merge(self, other: Self) -> None:
+        """Merge `other` to this `NpmNode`.
+
+        This should be used on NpmNodes that belong to a `Node` with the same
+        tag!
+        """
+        for access in other:
+            self.add_access(access)
 
 
 class GenericTree(Tree):

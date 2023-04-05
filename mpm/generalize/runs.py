@@ -10,7 +10,7 @@ from diff_match_patch import diff_match_patch as DiffMatchPatch
 from collections.abc import Iterable
 from re import escape, fullmatch
 from collections import Counter
-from copy import deepcopy
+from copy import deepcopy, copy
 from mpm.config import MULTIPLE_RUNS_STRATEGY, MultipleRunsSingleton
 
 
@@ -48,6 +48,8 @@ def _get_numeric_regexp(name: str) -> str:
     Replace strings of numeric characters in `name` by unlimited number of
     decimal regexp characters.
     """
+    # First escape all regexp characters:
+    name = escape(name)
     ret = ''
     in_number = False
     try:
@@ -80,7 +82,19 @@ def construct_regex_and_delete_originals(all_paths, paths, regex_tree, reg):
             if node is None:
                 raise RuntimeError(f'Unexpected: {row.path} not in the tree.')
             accesses.update(node.data)
-            node.data.clear()
+
+            # Clearing original accesses without additional processing is not a
+            # good idea. This leaves a node without any permissions, causing the
+            # decision algorithm to deny any access to that node. Correct
+            # solution would be to remove the whole node altogether, but also
+            # remove that same node from other trees.
+            #
+            # As this would be more complicated to implement, an easier solution
+            # is here: just don't remove the original accesses. When accessing
+            # this file, the original access will be used and for any other
+            # access, the regexp will be used. So ot removing the access won't
+            # break anything.
+            # node.data.clear()
             break
 
     # print(f'{accesses=} for {control.path}')
@@ -217,8 +231,16 @@ def _check_tree(new_tree: NpmTree, new_node: Node, tree: NpmTree, node: Node):
         if child.tag in new_children_tag_to_node:
             # This directory is already present in the new tree, no need to move
             # anything
-            # TODO: Move permissions
+            #
+            # Move permissions from child to new_child_node.
             new_child_node = new_children_tag_to_node[child.tag]
+            if new_child_node.data is None and child.data is not None:
+                # Original node was empty, just copy the `NpmNode`.
+                new_child_node.data = copy(child.data)
+            elif new_child_node.data is not None and child.data is not None:
+                # Original node has some accesses, merge the new one into it.
+                assert new_child_node.data.is_regexp == child.data.is_regexp
+                new_child_node.data.merge(child.data)
         else:
             # Copy `child` to the `new_tree` at the same position
             new_child_node = deepcopy(child)
