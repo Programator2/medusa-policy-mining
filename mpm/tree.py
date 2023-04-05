@@ -94,9 +94,6 @@ class NpmNode(set):
         # contain just one object, but I'm keeping it as a set just in case.
         self.generalized: set[Access] = set()
 
-        # Used by multiple runs generalizator
-        self.visited = False
-
         # Nodes represented by a regexp set this to `True`
         self.is_regexp = False
 
