@@ -3,10 +3,9 @@ from treelib import Tree
 from treelib.exceptions import NodeIDAbsentError
 from treelib.node import Node
 from typing import Callable, Self
-from collections import UserList, Counter
+from collections import Counter
 from pprint import pprint
 from collections.abc import Iterable
-from more_itertools import first
 from mpm.permission import Permission
 from mpm.mpm_types import AuditEntry
 from mpm.generalize.generalize import generalize_nonexistent
@@ -283,8 +282,7 @@ class NpmTree(GenericTree):
             if exists is not None:
                 parent = exists
             else:
-                pattern = r'[^\\]\.'
-                if search(pattern, e) is not None:
+                if search(r'[^\\]\.', e) is not None:
                     is_regexp = True
                 else:
                     is_regexp = False
@@ -501,7 +499,9 @@ class NpmTree(GenericTree):
             regex_node = NpmNode()
             regex_node.is_regexp = True
 
-            regex_tree_node = self.create_node('.*', parent=node, data=regex_node)
+            regex_tree_node = self.create_node(
+                '.*', parent=node, data=regex_node
+            )
 
             for domain in medusa_domains:
                 a = Access(Permission.READ | Permission.WRITE)
