@@ -58,6 +58,16 @@ same service can be specified without the splitter.""",
     # Double pass because reference items may be added to the database through
     # generalization
     for _ in range(2):
+        eval_case = 'no generalization'
+        results[eval_case] = mpm.test_cases.no_generalization.test(
+            trees[0],
+            case,
+            eval_case,
+            subject_contexts,
+            object_types,
+            domain_transitions[0].values(),
+            db,
+        )
         eval_case = 'standard generalization'
         results[eval_case] = mpm.test_cases.generalize.test(
             trees[0],
