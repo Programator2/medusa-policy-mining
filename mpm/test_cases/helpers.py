@@ -6,6 +6,25 @@ from mpm.tree import NpmTree
 from pathlib import Path
 
 
+def prepare_selinux_accesses(
+    db: DatabaseWriter,
+    case: str,
+    subject_contexts: Iterable[str],
+    object_types: Iterable[str],
+):
+    """Insert SELinux accesses into the database.
+
+    Accesses are selected according to `object_types`. This function should be
+    called just once before the generalization tests.
+    """
+    db.insert_selinux_accesses(
+        case,
+        subject_contexts,
+        object_types,
+        verbose=False,
+    )
+
+
 def populate_accesses(
     tree: NpmTree,
     db: DatabaseWriter,
@@ -21,14 +40,6 @@ def populate_accesses(
         eval_case,
         subject_contexts,
         medusa_domains,
-    )
-
-    # TODO: This needs to be done just once --- refactor it out
-    db.insert_selinux_accesses(
-        case,
-        subject_contexts,
-        object_types,
-        verbose=False,
     )
 
     db.fill_missing_selinux_accesses(

@@ -48,63 +48,68 @@ same service can be specified without the splitter.""",
     case = 'postgresql1'
     results = {}
 
-    results['standard generalization'] = (
-        mpm.test_cases.generalize.test(
+    subject_contexts = mpm.contexts.subjects.POSTGRESQL
+    object_types = mpm.contexts.objects.POSTGRESQL
+
+    mpm.test_cases.helpers.prepare_selinux_accesses(
+        db, case, subject_contexts, object_types
+    )
+
+    # Double pass because reference items may be added to the database through
+    # generalization
+    for _ in range(2):
+        eval_case = 'standard generalization'
+        results[eval_case] = mpm.test_cases.generalize.test(
             trees[0],
-            'postgresql1',
-            'standard generalization',
-            mpm.contexts.subjects.POSTGRESQL,
-            mpm.contexts.objects.POSTGRESQL,
+            case,
+            eval_case,
+            subject_contexts,
+            object_types,
             domain_transitions[0].values(),
             db,
         )
-    )
-    results['by owner'] = (
-        mpm.test_cases.generalize_by_owner.test(
+        eval_case = 'by owner'
+        results[eval_case] = mpm.test_cases.generalize_by_owner.test(
             trees[0],
-            'postgresql1',
-            'by owner',
-            mpm.contexts.subjects.POSTGRESQL,
-            mpm.contexts.objects.POSTGRESQL,
+            case,
+            eval_case,
+            subject_contexts,
+            object_types,
             domain_transitions[0].values(),
             db,
         )
-    )
-    results['by owner directory'] = (
-        mpm.test_cases.generalize_by_owner_directory.test(
+        eval_case = 'by owner directory'
+        results[eval_case] = mpm.test_cases.generalize_by_owner_directory.test(
             trees[0],
-            'postgresql1',
-            'by owner directory',
-            mpm.contexts.subjects.POSTGRESQL,
-            mpm.contexts.objects.POSTGRESQL,
+            case,
+            eval_case,
+            subject_contexts,
+            object_types,
             domain_transitions[0].values(),
             db,
             [db.get_uid_from_name('postgres')],
-            []
+            [],
         )
-    )
-    results['nonexistent'] = (
-        mpm.test_cases.generalize_nonexistent.test(
+        eval_case = 'nonexistent'
+        results[eval_case] = mpm.test_cases.generalize_nonexistent.test(
             trees[0],
-            'postgresql1',
-            'nonexistent',
-            mpm.contexts.subjects.POSTGRESQL,
-            mpm.contexts.objects.POSTGRESQL,
+            case,
+            eval_case,
+            subject_contexts,
+            object_types,
             domain_transitions[0].values(),
             db,
         )
-    )
-    results['multiple'] = (
-        mpm.test_cases.generalize_multiple_runs.test(
+        eval_case = 'multiple'
+        results[eval_case] = mpm.test_cases.generalize_multiple_runs.test(
             trees,
-            'postgresql1',
-            'multiple',
-            mpm.contexts.subjects.POSTGRESQL,
-            mpm.contexts.objects.POSTGRESQL,
+            case,
+            eval_case,
+            subject_contexts,
+            object_types,
             domain_transitions[0].values(),
             db,
         )
-    )
 
     db.close()
 
