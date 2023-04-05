@@ -43,7 +43,9 @@ def regex_from_diff(diff: Iterable[tuple[int, str]]) -> str:
 
 
 def _get_numeric_regexp(name: str) -> str:
-    """Replace strings of numeric characters in `name` by unlimited number of
+    """Replace strings of numeric characters by regexp.
+
+    Replace strings of numeric characters in `name` by unlimited number of
     decimal regexp characters.
     """
     ret = ''
@@ -203,6 +205,7 @@ def generalize_mupltiple_runs(db: DatabaseRead, *trees: NpmTree) -> NpmTree:
 
 
 def _check_tree(new_tree: NpmTree, new_node: Node, tree: NpmTree, node: Node):
+    """Merge `tree` into `new_tree`."""
     children_nids = node.successors(tree.identifier)
     new_children_nids = new_node.successors(new_tree.identifier)
     new_children_tag_to_node = {
