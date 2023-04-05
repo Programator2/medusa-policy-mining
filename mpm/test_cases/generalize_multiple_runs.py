@@ -14,6 +14,7 @@ def test(
     medusa_domains: Iterable[tuple[tuple]],
     db: DatabaseWriter
 ):
+    trees = [NpmTree(tree=tree, deep=True) for tree in trees]
     regex_tree = generalize_mupltiple_runs(db, *trees)
     new_tree = merge_tree(*trees, regex_tree)
     new_tree.move_generalized_to_regexp()
