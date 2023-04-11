@@ -7,7 +7,7 @@ from collections import Counter
 from pprint import pprint
 from collections.abc import Iterable
 from mpm.permission import Permission
-from mpm.mpm_types import AuditEntry
+from mpm.mpm_types import AuditEntry, FHSConfigRule
 from mpm.generalize.generalize import generalize_nonexistent
 from mpm.domain import get_current_euid
 from fs2json.db import DatabaseRead, DatabaseWriter
@@ -20,7 +20,7 @@ from mpm.config import (
 )
 import sys
 from copy import copy
-from re import search, fullmatch
+from re import search, fullmatch, split
 from bitarray import bitarray as Bitarray
 
 
@@ -145,12 +145,23 @@ class GenericTree(Tree):
     def __init__(self, tree=None, deep=False):
         super().__init__(tree, deep)
 
-    def _create_path(self, entries: Iterable):
+    def _create_path(self, entries: Iterable) -> Node:
         """Create necessary nodes in the tree to represent a path.
 
         :param path: tuple of strings representing names of nodes in the path
+        :returns: created `Node` representing `entries[-1]`
         """
         parent = self.npm_root
+        return self._create_path_generic(entries, parent)
+
+    def _create_path_generic(self, entries: Iterable, parent: Node) -> Node:
+        """Create necessary nodes in the tree to represent a path.
+
+        :param path: tuple of strings representing names of nodes in the path
+        :param parent: parent `Node` in which the path will be created. This
+        means that `entries[0]` will be created under `parent`.
+        :returns: created `Node` representing `entries[-1]`
+        """
         for e in entries:
             exists = next(
                 filter(
@@ -217,6 +228,54 @@ class NpmTree(GenericTree):
             access.domain = d.domain
 
             node.data.add_access(access)
+
+    def search_children_by_tag(self, parent: Node, tag: str) -> list[Node]:
+        """Return list of nodes that match the tag directly under parent."""
+        # TODO: This method could be used to refactor similar code in this class
+        return list(
+            filter(
+                lambda x: x.tag == tag,
+                (self[y] for y in parent.successors(self.identifier)),
+            )
+        )
+
+    @staticmethod
+    def _parse_raw_perms(raw_perms: str) -> tuple[Permission, bool]:
+        perms = Permission(0)
+        recursive = False
+        for c in raw_perms:
+            match c:
+                case 'r':
+                    recursive = True
+                case 'R':
+                    perms |= Permission.READ
+                case 'W':
+                    perms |= Permission.WRITE
+                case 'S':
+                    perms |= Permission.SEE
+        return perms, recursive
+
+    @staticmethod
+    def load_fhs_config(f) -> list[FHSConfigRule]:
+        """Parse FHS config and return FHS rules."""
+        # TODO: Probably move this to the parser module
+        ret: list[FHSConfigRule] = []
+        for l in f:
+            match split(r'\t+', l):
+                case (path, raw_perms, regexp):
+                    perms, recursive = NpmTree._parse_raw_perms(raw_perms)
+                    if regexp == 'reg':
+                        regexp = True
+                    else:
+                        raise RuntimeError(f'Invalid value: {regexp}')
+                case (path, raw_perms):
+                    perms, recursive = NpmTree._parse_raw_perms(raw_perms)
+                    regexp = False
+                case _:
+                    raise RuntimeError(f'Invalid line: {l}')
+            rule = FHSConfigRule(path, perms, recursive, regexp)
+            ret.append(rule)
+        return ret
 
     def get_parent(self, node: Node) -> Node:
         """Return parent Node object for node"""
@@ -954,6 +1013,125 @@ WHERE rowid = 1
         nodes.reverse()
         assert nodes[0].tag == '/'
         return self._node_to_db_paths(db, nodes[1:], 1)
+
+    def _create_missing_star_nodes(self, parent: Node) -> None:
+        """Create `.*` regexp nodes under `parent` (inclusive)."""
+        nodes = [
+            self[y] for y in self.expand_tree(parent.identifier, sorting=False)
+        ]
+        for node in nodes:
+            star_nodes = self.search_children_by_tag(node, '.*')
+            assert len(star_nodes) <= 1
+            if star_nodes:
+                print('star nodes:', star_nodes)
+                continue
+            # We have to create a new '.*' node
+            # TODO: refactor into a procedure in `generalize_by_owner_directory`
+            regex_node = NpmNode()
+            regex_node.is_regexp = True
+
+            print(f'creating under {node.tag}')
+            self.create_node('.*', parent=node, data=regex_node)
+
+    def _generalize_fhs_rule(
+        self,
+        parent_node: Node,
+        children: list[str],
+        regexp: bool,
+        recursive: bool,
+    ) -> list[Node]:
+        """Recursive method for searching nodes according to children.
+
+        Order of method calls is important! Since this function transforms
+        recursive rules into regexps (only according to the `children` path),
+        this method should be called last when fixing underpermissions.
+        """
+        if not children:
+            if recursive:
+                # Create missing .* regexp nodes
+                self._create_missing_star_nodes(parent_node)
+                # We have to return `parent_node` and recursively all its children
+                return [
+                    self[i]
+                    for i in self.expand_tree(
+                        parent_node.identifier, sorting=False
+                    )
+                ]
+            # Final component, this should be returned
+            return [parent_node]
+
+        ret: list[Node] = []
+        child = children[0]
+        found = False
+        # First searching for direct nodes (containing name)
+        for y in parent_node.successors(self.identifier):
+            node = self[y]
+            if node.data and node.data.is_regexp:
+                # This is a regexp node
+                if regexp:
+                    if node.tag == child:
+                        # Regexp pattern is the same, we take this node.
+                        ret.extend(
+                            self._generalize_fhs_rule(
+                                node, children[1:], regexp, recursive
+                            )
+                        )
+                # We are not searching for regexp nodes, but for a specific
+                # path. Therefore we continue with the next successor.
+                continue
+            if regexp:
+                # `child` is a regexp pattern, `node.tag` is literal.
+                if fullmatch(child, node.tag):
+                    ret.extend(
+                        self._generalize_fhs_rule(
+                            node, children[1:], regexp, recursive
+                        )
+                    )
+            elif node.tag == child:
+                ret.extend(
+                    self._generalize_fhs_rule(
+                        node, children[1:], regexp, recursive
+                    )
+                )
+        if not ret:
+            # We haven't found the node. Let's construct a path from what's left
+            # of `children`.
+            return [self._create_path_generic(children, parent_node)]
+        return ret
+
+    def generalize_fhs_rule(
+        self, rule: FHSConfigRule, access_info: Iterable[tuple[int, str, tuple]]
+    ) -> list[Node]:
+        """Generalize rule in the tree.
+
+        :param rule: `FHSConfigRule` object containing the path and information
+        about the rule..
+
+        :param access_info: Iterable of tuples that consist of:
+        uid: eUID of the domain
+        domain: domain tuple
+        """
+        path = rule.path
+        permissions = rule.permissions
+        recursive = rule.recursive
+        regexp = rule.regexp
+        assert path[0] == '/'
+        if len(path) > 1:
+            assert path[-1] != '/'
+        entries = list(filter(lambda x: bool(x), path.split('/')))
+        parent = self.npm_root
+        nodes = self._generalize_fhs_rule(parent, entries, regexp, recursive)
+        for node in nodes:
+            if (data := node.data) is None:
+                node.data = NpmNode()
+                data = node.data
+
+            for uid, domain in access_info:
+                access = Access(permissions)
+                access.uid = uid
+                access.domain = domain
+
+                data.add_access(access)
 
     def print_backend(
         self,

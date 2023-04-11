@@ -36,3 +36,13 @@ AuditEntry = namedtuple(
         'domain',
     ],
 )
+
+FHSConfigRule = namedtuple(
+    'FHSConfgRule',
+    [
+        'path',
+        'permissions',
+        'recursive',
+        'regexp',
+    ],
+)
