@@ -30,10 +30,6 @@ class Access:
     def __init__(self, permissions: Permission):
         self.permissions = permissions
         self._uid = None
-        # comm is being deprecated as it doesn't accurate represent the current
-        # domain of the process (it may be changed by the running process and
-        # Medusa doesn't keep it updated one set in the kobject)
-        self._comm = None
         self._domain = None
 
     @property
@@ -45,16 +41,6 @@ class Access:
         if self._uid is not None:
             raise Exception("attribute can't be modified")
         self._uid = uid
-
-    @property
-    def comm(self):
-        return self._comm
-
-    @comm.setter
-    def comm(self, comm):
-        if self._comm is not None:
-            raise Exception("attribute can't be modified")
-        self._comm = comm
 
     @property
     def domain(self):
@@ -71,7 +57,7 @@ class Access:
         return f'<{str(hash(self.domain))[:2]} {self.domain[-1][0]}({self.domain[-1][1]}): {self.permissions}>'
 
     def full_repr(self) -> str:
-        return f'<{self.domain} {self.comm} ({self.uid}): {self.permissions}>'
+        return f'<{self.domain} ({self.uid}): {self.permissions}>'
 
     def __eq__(self, other):
         return (
@@ -228,7 +214,6 @@ class NpmTree(GenericTree):
 
             access = Access(perm)
             access.uid = int(d.uid)
-            access.comm = d.proctitle
             access.domain = d.domain
 
             node.data.add_access(access)

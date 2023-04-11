@@ -100,7 +100,7 @@ def make_unique(name: str, s: dict) -> str:
 def get_access_name(access: Access) -> str:
     """Create a descriptive name for access."""
     # TODO: replace in one pass
-    domain = access.comm.replace(" ", "").replace('/', '_')
+    domain = access.domain[-1][0].replace(" ", "").replace('/', '_')
     return f'{domain}{access.uid}_{access.permissions.short_repr()}'
 
 
