@@ -220,7 +220,7 @@ class NpmTree(GenericTree):
 
             perm = Permission(int(d.permission))
 
-            if node.data == None:
+            if node.data is None:
                 node.data = NpmNode()
 
             access = Access(perm)
@@ -311,6 +311,9 @@ class NpmTree(GenericTree):
         (not `/`). Path components that contain regexps will be inserted into
         node's generalization set.
         """
+        assert path[0] == '/'
+        if len(path) > 1:
+            assert path[-1] != '/'
         entries = filter(lambda x: bool(x), path.split('/'))
         parent = self.npm_root
         for e in entries:
