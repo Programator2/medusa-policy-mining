@@ -8,6 +8,7 @@ from fs2json.db import DatabaseWriter
 from more_itertools import split_at
 import mpm.contexts
 import mpm.test_cases
+from fs2json.evaluation import Result
 
 
 def main():
@@ -46,7 +47,7 @@ same service can be specified without the splitter.""",
     db = DatabaseWriter('fs.db')
 
     case = 'postgresql1'
-    results = {}
+    results: dict[Result] = {}
 
     subject_contexts = mpm.contexts.subjects.POSTGRESQL
     object_types = mpm.contexts.objects.POSTGRESQL
@@ -123,7 +124,10 @@ same service can be specified without the splitter.""",
 
     db.close()
 
-    pprint(results)
+    for name, result in results.items():
+        print(name)
+        print('-' * len(name))
+        print(result.summary(), end='\n\n')
 
     return 0
 
