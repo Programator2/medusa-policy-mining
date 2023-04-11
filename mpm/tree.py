@@ -543,6 +543,7 @@ class NpmTree(GenericTree):
             if node is None:
                 node = self._create_path(path)
 
+            # TODO: refactor into a procedure in `generalize_by_owner_directory`
             regex_node = NpmNode()
             regex_node.is_regexp = True
 
@@ -912,13 +913,18 @@ WHERE rowid = 1
         not found.
         :returns: Matched `Node` or `None`.
         """
+        # This is just for optimization, so we don't have to double-traverse the
+        # successors list. We will store regexp nodes in this list and later use
+        # it. But only if we really need it (serach_regexp).
         if search_regexp:
             regexps: list[Node] = []
         # First searching for direct nodes (containing name)
         for y in parent.successors(self.identifier):
             node = self[y]
             if node.data and node.data.is_regexp:
+                # This node is a regexp node
                 if search_regexp:
+                    # We will need it later
                     regexps.append(node)
                 continue
             if node.tag == name:
