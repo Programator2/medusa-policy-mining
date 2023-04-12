@@ -308,18 +308,25 @@ class NpmTree(GenericTree):
             ret[self.get_path(node)] = node
         return ret
 
-    def add_path_generalization(self, path: str) -> Node:
+    @staticmethod
+    def is_regexp(s: str) -> bool:
+        """Return `True` if `s` is a regexp.
+
+        Currently support just `.`. Needs to be updated to support more types of
+        regexps.
+        """
+        return '.' in s
+
+    def _add_path_generalization(
+        self, parent: Node, entries: list[str]
+    ) -> Node:
         """Add regexp generalization to the tree.
 
-        :param path: String starting with `/` and ending with last component
-        (not `/`). Path components that contain regexps will be inserted into
-        node's generalization set.
+        :param entries: All items in `entries` that contain dot '.' have to be
+        escaped. This is because a dot character is automatically recognized as
+        regexp. This is a serious flaw and should be fixed in future versions
+        (TODO).
         """
-        assert path[0] == '/'
-        if len(path) > 1:
-            assert path[-1] != '/'
-        entries = filter(lambda x: bool(x), path.split('/'))
-        parent = self.npm_root
         for e in entries:
             # Check if this is a regular expression (currently checking just for
             # the dot)
@@ -333,7 +340,9 @@ class NpmTree(GenericTree):
             if exists is not None:
                 parent = exists
             else:
-                if search(r'[^\\]\.', e) is not None:
+                if self.is_regexp(e):
+                    # TODO: I have serious doubts about the above `if`
+                    # statement. Also see docstring of this method.
                     is_regexp = True
                 else:
                     is_regexp = False
@@ -345,6 +354,22 @@ class NpmTree(GenericTree):
         # Transfer permission from regexed paths, maybe return and do it in the
         # caller
         return parent
+
+    def add_path_generalization(self, path: str) -> Node:
+        """Add regexp generalization to the tree.
+
+        Used by the multiple runs generalizer. See `generalize_multiple_runs`.
+
+        :param path: String starting with `/` and ending with last component
+        (not `/`). Path components that contain regexps will be inserted into
+        node's generalization set.
+        """
+        assert path[0] == '/'
+        if len(path) > 1:
+            assert path[-1] != '/'
+        entries = filter(lambda x: bool(x), path.split('/'))
+        parent = self.npm_root
+        return self._add_path_generalization(parent, entries)
 
     def generalize(self, node: Node, verbose=False) -> None:
         """Do a recursive depth-first search and on the way up TODO:
