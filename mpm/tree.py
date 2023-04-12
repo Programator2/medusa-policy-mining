@@ -1101,9 +1101,11 @@ WHERE rowid = 1
         """
         if not children:
             if recursive:
-                # Create missing .* regexp nodes
+                # Create missing .* regexp nodes. These nodes will have
+                # `is_regexp` attribute set in their `data` `NpmNode`.
                 self._create_missing_star_nodes(parent_node)
-                # We have to return `parent_node` and recursively all its children
+                # We have to return `parent_node` and recursively all its
+                # children
                 return [
                     self[i]
                     for i in self.expand_tree(
@@ -1133,6 +1135,7 @@ WHERE rowid = 1
                 # We are not searching for regexp nodes, but for a specific
                 # path. Therefore we continue with the next successor.
                 continue
+            # It is a literal node
             if regexp:
                 # `child` is a regexp pattern, `node.tag` is literal.
                 if fullmatch(child, node.tag):
