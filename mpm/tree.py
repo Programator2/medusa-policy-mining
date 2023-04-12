@@ -261,7 +261,10 @@ class NpmTree(GenericTree):
         # TODO: Probably move this to the parser module
         ret: list[FHSConfigRule] = []
         for l in f:
-            match split(r'\t+', l):
+            if l[0] == '#' or l == '\n':
+                # This is a comment or an empty line
+                continue
+            match split(r'\t+', l.rstrip()):
                 case (path, raw_perms, regexp):
                     perms, recursive = NpmTree._parse_raw_perms(raw_perms)
                     if regexp == 'reg':
@@ -271,8 +274,9 @@ class NpmTree(GenericTree):
                 case (path, raw_perms):
                     perms, recursive = NpmTree._parse_raw_perms(raw_perms)
                     regexp = False
-                case _:
-                    raise RuntimeError(f'Invalid line: {l}')
+                case [path]:
+                    perms, recursive = NpmTree._parse_raw_perms(raw_perms)
+                    regexp = False
             rule = FHSConfigRule(path, perms, recursive, regexp)
             ret.append(rule)
         return ret
