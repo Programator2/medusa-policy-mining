@@ -68,7 +68,9 @@ def _get_numeric_regexp(name: str) -> str:
     return ret
 
 
-def construct_regex_and_delete_originals(all_paths, paths, regex_tree, reg):
+def construct_regex_and_delete_originals(
+    all_paths, paths, regex_tree, reg, verbose=False
+):
     # 1. Get original accesses and delete them from original tree
     accesses: set[Access] = set()
     for row in all_paths:
@@ -98,6 +100,8 @@ def construct_regex_and_delete_originals(all_paths, paths, regex_tree, reg):
             break
 
     # print(f'{accesses=} for {control.path}')
+    if verbose:
+        print('Generated multiple runs regexp:', reg)
 
     # 2. Construct a new path with regex
     node = regex_tree.add_path_generalization(reg)
@@ -171,12 +175,12 @@ def generalize_mupltiple_runs(db: DatabaseRead, *trees: NpmTree) -> NpmTree:
                     case MultipleRunsSingleton.NUMERICAL_GENERALIZATION:
                         reg = _get_numeric_regexp(all_paths[0].path)
                         construct_regex_and_delete_originals(
-                            all_paths, paths, regex_tree, reg
+                            all_paths, paths, regex_tree, reg, True
                         )
                     case MultipleRunsSingleton.FULL_GENERALIZATION:
                         reg = '.*'
                         construct_regex_and_delete_originals(
-                            all_paths, paths, regex_tree, reg
+                            all_paths, paths, regex_tree, reg, True
                         )
                 continue
             control, *others = all_paths
@@ -210,7 +214,7 @@ def generalize_mupltiple_runs(db: DatabaseRead, *trees: NpmTree) -> NpmTree:
                     breakpoint()
 
             construct_regex_and_delete_originals(
-                all_paths, paths, regex_tree, reg
+                all_paths, paths, regex_tree, reg, True
             )
 
         # print('=' * 80)
