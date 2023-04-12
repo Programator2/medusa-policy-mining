@@ -1052,6 +1052,21 @@ WHERE rowid = 1
         assert nodes[0].tag == '/'
         return self._node_to_db_paths(db, nodes[1:], 1)
 
+    def _create_path_regexp(self, parent: Node, entries: list[str]) -> Node:
+        for e in entries:
+            # Check if this is a regular expression (currently checking just for
+            # the dot)
+            if self.is_regexp(e):
+                is_regexp = True
+            else:
+                is_regexp = False
+            data = NpmNode()
+            data.is_regexp = is_regexp
+            parent = self.create_node(e, parent=parent.identifier, data=data)
+        # Transfer permission from regexed paths, maybe return and do it in the
+        # caller
+        return parent
+
     def _create_missing_star_nodes(self, parent: Node) -> None:
         """Create `.*` regexp nodes under `parent` (inclusive)."""
         nodes = [
@@ -1100,8 +1115,8 @@ WHERE rowid = 1
 
         ret: list[Node] = []
         child = children[0]
-        found = False
-        # First searching for direct nodes (containing name)
+        if regexp:
+            regexp_found = False
         for y in parent_node.successors(self.identifier):
             node = self[y]
             if node.data and node.data.is_regexp:
@@ -1109,6 +1124,7 @@ WHERE rowid = 1
                 if regexp:
                     if node.tag == child:
                         # Regexp pattern is the same, we take this node.
+                        regexp_found = True
                         ret.extend(
                             self._generalize_fhs_rule(
                                 node, children[1:], regexp, recursive
@@ -1125,13 +1141,26 @@ WHERE rowid = 1
                             node, children[1:], regexp, recursive
                         )
                     )
+                if child == node.tag:
+                    # This is a special case when regexp is the same as the
+                    # literal node. This means that `child` is a literal string
+                    # without expanding characters. We consider this situation
+                    # the same as if the regex has been found.
+                    regexp_found = True
             elif node.tag == child:
+                # Literal node was found
                 ret.extend(
                     self._generalize_fhs_rule(
                         node, children[1:], regexp, recursive
                     )
                 )
+        if regexp and not regexp_found:
+            # Create the missing regexp
+            ret.extend([self._create_path_regexp(parent_node, children)])
         if not ret:
+            # If we went this far, regexp should have been created. If not, it's
+            # necessary to examine the situation
+            assert not regexp
             # We haven't found the node. Let's construct a path from what's left
             # of `children`.
             return [self._create_path_generic(children, parent_node)]
@@ -1163,6 +1192,12 @@ WHERE rowid = 1
             if (data := node.data) is None:
                 node.data = NpmNode()
                 data = node.data
+
+            if recursive and node.tag == '.*':
+                # All `.*` nodes under a recursive node should have
+                # `is_recursive` attribute set so that permission computation
+                # will work correctly.
+                data.is_recursive = True
 
             for uid, domain in access_info:
                 access = Access(permissions)
