@@ -820,7 +820,7 @@ WHERE rowid = 1
 
             # Get node applicable for this path
             node = self.get_node_at_path(
-                path, search_regexp=True, verbose=False, search_recursive=True
+                path, search_regexp=True, verbose=True, search_recursive=True
             )
 
             if node is None or not (data := node.data):
