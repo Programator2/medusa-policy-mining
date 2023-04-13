@@ -72,7 +72,7 @@ def export_results(
         db.print_confusion(
             case_name, subject_contexts, eval_case, 'correct denial', f
         )
-    with open(result_dir / 'undepermission.txt', 'w') as f:
+    with open(result_dir / 'underpermission.txt', 'w') as f:
         db.print_confusion(
             case_name, subject_contexts, eval_case, 'underpermission', f
         )
