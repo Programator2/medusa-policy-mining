@@ -2,6 +2,7 @@ from mpm.tree import NpmTree
 from fs2json.db import DatabaseRead
 from collections.abc import Iterable
 from mpm.test_cases.helpers import populate_accesses, export_results
+from mpm.generalize.generalize import generalize_from_fhs_rules
 
 
 def test(
@@ -13,8 +14,8 @@ def test(
     medusa_domains: Iterable[tuple[tuple]],
     db: DatabaseRead,
 ):
-    tree.show()
     tree = NpmTree(tree=tree, deep=True)
+    generalize_from_fhs_rules('fhs_rules.txt', tree, medusa_domains)
     populate_accesses(
         tree,
         db,

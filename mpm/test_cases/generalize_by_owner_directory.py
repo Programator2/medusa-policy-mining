@@ -3,6 +3,7 @@ from fs2json.db import DatabaseWriter
 from collections.abc import Iterable
 from mpm.test_cases.helpers import populate_accesses, export_results
 from mpm.domain import get_current_euid
+from mpm.generalize.generalize import generalize_from_fhs_rules
 
 
 def test(
@@ -17,13 +18,11 @@ def test(
     gids: Iterable[int] = [],
 ):
     tree = NpmTree(tree=tree, deep=True)
-    tree.show()
-    print('-'*80)
     domains = list(filter(lambda x: get_current_euid(x) in uids,
                           medusa_domains))
     tree.generalize_by_owner_directory(db, domains, uids, gids, verbose=True)
     tree.move_generalized_to_regexp()
-    tree.show()
+    generalize_from_fhs_rules('fhs_rules.txt', tree, medusa_domains)
     populate_accesses(
         tree,
         db,

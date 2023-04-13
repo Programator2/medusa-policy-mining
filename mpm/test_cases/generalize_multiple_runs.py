@@ -3,6 +3,7 @@ from fs2json.db import DatabaseWriter
 from collections.abc import Iterable
 from mpm.generalize.runs import generalize_mupltiple_runs, merge_tree
 from mpm.test_cases.helpers import populate_accesses, export_results
+from mpm.generalize.generalize import generalize_from_fhs_rules
 
 
 def test(
@@ -12,12 +13,13 @@ def test(
     subject_contexts: Iterable[str],
     object_types: Iterable[str],
     medusa_domains: Iterable[tuple[tuple]],
-    db: DatabaseWriter
+    db: DatabaseWriter,
 ):
     trees = [NpmTree(tree=tree, deep=True) for tree in trees]
     regex_tree = generalize_mupltiple_runs(db, *trees)
     new_tree = merge_tree(*trees, regex_tree)
     new_tree.move_generalized_to_regexp()
+    generalize_from_fhs_rules('fhs_rules.txt', new_tree, medusa_domains)
     populate_accesses(
         new_tree,
         db,

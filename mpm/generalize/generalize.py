@@ -2,6 +2,7 @@ import re
 from pathlib import PurePosixPath
 from fs2json.db import DatabaseRead
 from mpm.config import GENERALIZE_PROC
+from mpm.tree import NpmTree
 
 
 def generalize_proc(path: str) -> str:
@@ -36,3 +37,38 @@ def generalize_nonexistent(path: str, db: DatabaseRead):
         return ''
     # Path doesn't exist, generalize up to last component
     return str(PurePosixPath(path) / '.*')
+
+
+def generalize_from_fhs_rules(
+    rules_path: str, tree: NpmTree, medusa_domains: Iterable[tuple[tuple]]
+) -> None:
+    """Generalize using rules from a file.
+
+    Rules should use general knowledge about the Linux operating system. Name
+    FHS comes from the Filesystem Hierarchy Standard that describes standard
+    hierarchy of folders and their contents. The rules should ideally include
+    permissions that are applicable to all subjects on the system (ambient
+    rules).
+
+    The main purpose of this function is to clean up undepermissions that are
+    created by the `fill_missing_selinux_accesses` method. Underpermission
+    entries that are created by that function may not be necessary for the
+    correct function of the application and they taint and shew the results of
+    the evaluation (higher false negatives).
+
+    `generalize_from_fhs_rules` can use different rules for every
+    generalization, but ideally, one rule list should be used.
+
+    :param rules_path: path to the rules file.
+    :param tree: tree that the generalization will be applied to.
+    :param medusa_domains: domains that will be used as subjects for the newly
+    created rules.
+    """
+    access_info = []
+    for d in medusa_domains:
+        access_info.append((d[-1][1], d))
+
+    with open(rules_path) as f:
+        rules = tree.load_fhs_config(f)
+    for rule in rules:
+        tree.generalize_fhs_rule(rule, access_info)
