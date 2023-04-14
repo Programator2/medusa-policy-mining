@@ -1,9 +1,11 @@
 """Helper functions for test cases."""
 
-from fs2json.db import DatabaseWriter
+from fs2json.db import DatabaseWriter, DatabaseRead
+from fs2json.evaluation import Result
 from collections.abc import Iterable
 from mpm.tree import NpmTree
 from pathlib import Path
+from mpm.generalize.generalize import generalize_from_fhs_rules
 
 
 def prepare_selinux_accesses(
@@ -60,6 +62,7 @@ def export_results(
     eval_case: str,
     subject_contexts: Iterable[str],
     db: DatabaseWriter,
+    confusion: Result,
     tree: NpmTree = None,
 ):
     result_dir = Path(f'results/{case_name}/{eval_case}')
@@ -83,3 +86,32 @@ def export_results(
     if tree is not None:
         with open(result_dir / 'tree.txt', 'w') as f:
             f.write(tree.show(stdout=False))
+    with open(result_dir / 'confusion.txt', 'w') as f:
+        f.write(confusion. summary())
+
+
+def evaluate(
+    tree: NpmTree,
+    case_name: str,
+    eval_case: str,
+    subject_contexts: Iterable[str],
+    object_types: Iterable[str],
+    medusa_domains: Iterable[tuple[tuple]],
+    db: DatabaseRead,
+    fhs_path: str,
+):
+    generalize_from_fhs_rules(fhs_path, tree, medusa_domains)
+    populate_accesses(
+        tree,
+        db,
+        case_name,
+        eval_case,
+        subject_contexts,
+        object_types,
+        medusa_domains,
+    )
+    confusion = db.get_permission_confusion(
+        case_name, subject_contexts, eval_case
+    )
+    export_results(case_name, eval_case, subject_contexts, db, confusion, tree)
+    return confusion

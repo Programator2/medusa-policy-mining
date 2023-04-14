@@ -99,6 +99,7 @@ def main():
         db, case, subject_contexts, object_types
     )
 
+    fhs_path = 'fhs_rules.txt'
     # Double pass because reference items may be added to the database through
     # generalization
     for _ in range(2):
@@ -111,6 +112,7 @@ def main():
             object_types,
             domain_transitions[0].values(),
             db,
+            fhs_path,
         )
         eval_case = 'standard generalization'
         results[eval_case] = mpm.test_cases.generalize.test(
@@ -121,6 +123,7 @@ def main():
             object_types,
             domain_transitions[0].values(),
             db,
+            fhs_path,
         )
         eval_case = 'by owner'
         results[eval_case] = mpm.test_cases.generalize_by_owner.test(
@@ -131,6 +134,7 @@ def main():
             object_types,
             domain_transitions[0].values(),
             db,
+            fhs_path,
         )
         eval_case = 'by owner directory'
         results[eval_case] = mpm.test_cases.generalize_by_owner_directory.test(
@@ -141,6 +145,7 @@ def main():
             object_types,
             domain_transitions[0].values(),
             db,
+            fhs_path,
             [db.get_uid_from_name(name) for name in uid_names],
             [db.get_gid_from_name(name) for name in gid_names],
         )
@@ -153,6 +158,7 @@ def main():
             object_types,
             domain_transitions[0].values(),
             db,
+            fhs_path,
         )
         eval_case = 'multiple'
         results[eval_case] = mpm.test_cases.generalize_multiple_runs.test(
@@ -163,6 +169,7 @@ def main():
             object_types,
             domain_transitions[0].values(),
             db,
+            fhs_path,
         )
 
     db.close()
