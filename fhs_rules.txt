@@ -178,3 +178,74 @@
 /tmp/.iprt-localipc-DRMIpcServer	R
 /tmp/\.X.+-lock	R	reg
 /tmp/.XIM-unix	RW
+
+# sshd:
+
+/dev/shm	W
+/proc/fb	W
+/proc/dma	W
+/proc/keys	W
+/proc/misc	W
+/proc/stat	W
+/proc/iomem	W
+/proc/locks	W
+/proc/swaps	W
+/proc/crypto	W
+/proc/uptime	W
+/proc/vmstat	W
+/proc/cgroups	W
+/proc/cmdline	W
+/proc/cpuinfo	W
+/proc/devices	W
+/proc/ioports	W
+/proc/loadavg	W
+/proc/modules	W
+/proc/version	W
+/proc/consoles	W
+/proc/slabinfo	W
+/proc/softirqs	W
+/proc/zoneinfo	W
+/proc/buddyinfo	W
+/proc/diskstats	W
+/proc/key-users	W
+/proc/interrupts	W
+/proc/kpagecount	W
+/proc/kpageflags	W
+/proc/partitions	W
+/proc/timer_list	W
+/proc/execdomains	W
+/proc/filesystems	W
+/proc/vmallocinfo	W
+/proc/pagetypeinfo	W
+
+# TODO: Create new generalizer that takes current PID and recursively allows access
+#/proc/1074/map_files/55e6fb25a000-55e6fb266000 read
+#/proc/1074/map_files/55e6fb266000-55e6fb2f1000 read
+#/proc/1074/map_files/55e6fb2f1000-55e6fb33b000 read
+#/proc/1074/map_files/55e6fb33b000-55e6fb33f000 read
+#/proc/1074/map_files/55e6fb33f000-55e6fb340000 read
+#/proc/1074/exe read
+#/proc/1074/task/1074/exe read
+
+/run/faillock	R
+/run/multipath	R
+/run/utmp	W
+
+/tmp/\.X.+?-lock	W	reg
+
+/etc/authselect	W
+/etc/ssh/ssh_config.d	W
+/etc/ssh/sshd_config.d	W
+/usr/share/crypto-policies	W
+/usr/share/crypto-policies/DEFAULT	W
+/usr/share/crypto-policies/EMPTY	W
+/usr/share/crypto-policies/FEDORA38	W
+/usr/share/crypto-policies/FIPS	W
+/usr/share/crypto-policies/FUTURE	W
+/usr/share/crypto-policies/LEGACY	W
+/usr/share/crypto-policies/TEST-FEDORA39	W
+/usr/share/crypto-policies/back-ends	W
+/usr/share/crypto-policies/policies	W
+/usr/share/crypto-policies/python	W
+
+/usr/lib/.build-id	rR
