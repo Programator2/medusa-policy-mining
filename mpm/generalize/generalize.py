@@ -1,8 +1,12 @@
+from __future__ import annotations
 import re
 from pathlib import PurePosixPath
 from fs2json.db import DatabaseRead
 from mpm.config import GENERALIZE_PROC
-from mpm.tree import NpmTree
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from mpm.tree import NpmTree
+from collections.abc import Iterable
 
 
 def generalize_proc(path: str) -> str:
