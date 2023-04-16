@@ -6,6 +6,22 @@ from collections.abc import Iterable
 from mpm.tree import NpmTree
 from pathlib import Path
 from mpm.generalize.generalize import generalize_from_fhs_rules
+from dataclasses import dataclass, field
+
+
+@dataclass
+class TestCaseContext:
+    tree: NpmTree
+    case_name: str
+    eval_case: str
+    subject_contexts: Iterable[str]
+    object_types: Iterable[str]
+    medusa_domains: Iterable[tuple[tuple]]
+    db: DatabaseRead
+    fhs_path: str
+    uids: Iterable[int] = field(default_factory=list)
+    gids: Iterable[int] = field(default_factory=list)
+    trees: Iterable[NpmTree] = field(default_factory=list)
 
 
 def prepare_selinux_accesses(
@@ -99,7 +115,7 @@ def evaluate(
     medusa_domains: Iterable[tuple[tuple]],
     db: DatabaseRead,
     fhs_path: str,
-):
+) -> Result:
     generalize_from_fhs_rules(fhs_path, tree, medusa_domains)
     populate_accesses(
         tree,
@@ -115,3 +131,22 @@ def evaluate(
     )
     export_results(case_name, eval_case, subject_contexts, db, confusion, tree)
     return confusion
+
+
+def prologue(ctx: TestCaseContext) -> None:
+    """Prepare test case."""
+    ctx.tree = NpmTree(tree=ctx.tree, deep=True)
+
+
+def epilogoue(ctx: TestCaseContext) -> Result:
+    """Compute evaluation."""
+    return evaluate(
+        ctx.tree,
+        ctx.case_name,
+        ctx.eval_case,
+        ctx.subject_contexts,
+        ctx.object_types,
+        ctx.medusa_domains,
+        ctx.db,
+        ctx.fhs_path
+    )

@@ -1,30 +1,6 @@
-from mpm.tree import NpmTree
-from fs2json.db import DatabaseRead
-from collections.abc import Iterable
-from mpm.test_cases.helpers import evaluate
+from mpm.test_cases.helpers import TestCaseContext
 
 
-def test(
-    tree: NpmTree,
-    case_name: str,
-    eval_case: str,
-    subject_contexts: Iterable[str],
-    object_types: Iterable[str],
-    medusa_domains: Iterable[tuple[tuple]],
-    db: DatabaseRead,
-    fhs_path: str,
-):
-    tree = NpmTree(tree=tree, deep=True)
-    # Do necessary generalizations here
-    tree.generalize(tree.get_node(tree.root), verbose=False)
-    tree.move_generalized_to_regexp()
-    return evaluate(
-        tree,
-        case_name,
-        eval_case,
-        subject_contexts,
-        object_types,
-        medusa_domains,
-        db,
-        fhs_path
-    )
+def test_core(ctx: TestCaseContext) -> None:
+    ctx.tree.generalize(ctx.tree.get_node(ctx.tree.root), verbose=False)
+    ctx.tree.move_generalized_to_regexp()

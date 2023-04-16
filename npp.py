@@ -15,6 +15,9 @@ from typing import Any
 import sys
 import io
 from pathlib import Path
+from mpm.test_cases.helpers import TestCaseContext
+from mpm.test_cases import TestCase
+from copy import copy
 
 
 def usage():
@@ -63,7 +66,7 @@ def main():
             case '--user':
                 uid_names.append(value)
             case '--group':
-                uid_names.append(value)
+                gid_names.append(value)
             case '--object':
                 object_types = get_object_types_by_name(value)
             case '--subject':
@@ -100,76 +103,58 @@ def main():
     )
 
     fhs_path = 'fhs_rules.txt'
+
+    ctx = TestCaseContext(
+        trees[0],
+        case,
+        '',
+        subject_contexts,
+        object_types,
+        domain_transitions[0].values(),
+        db,
+        fhs_path,
+    )
+    ctx.trees = trees
+    ctx.uids = [db.get_uid_from_name(name) for name in uid_names]
+    ctx.gids = [db.get_gid_from_name(name) for name in gid_names]
+
     # Double pass because reference items may be added to the database through
     # generalization
     for _ in range(2):
-        eval_case = 'no generalization'
-        results[eval_case] = mpm.test_cases.no_generalization.test(
-            trees[0],
-            case,
-            eval_case,
-            subject_contexts,
-            object_types,
-            domain_transitions[0].values(),
-            db,
-            fhs_path,
+        ctx.eval_case = 'no generalization'
+        test_cases = (TestCase.NO_GENERALIZATION,)
+        results[ctx.eval_case] = mpm.test_cases.execute_tests(
+            test_cases, copy(ctx)
         )
-        eval_case = 'standard generalization'
-        results[eval_case] = mpm.test_cases.generalize.test(
-            trees[0],
-            case,
-            eval_case,
-            subject_contexts,
-            object_types,
-            domain_transitions[0].values(),
-            db,
-            fhs_path,
+
+        ctx.eval_case = 'standard generalization'
+        test_cases = (TestCase.STANDARD,)
+        results[ctx.eval_case] = mpm.test_cases.execute_tests(
+            test_cases, copy(ctx)
         )
-        eval_case = 'by owner'
-        results[eval_case] = mpm.test_cases.generalize_by_owner.test(
-            trees[0],
-            case,
-            eval_case,
-            subject_contexts,
-            object_types,
-            domain_transitions[0].values(),
-            db,
-            fhs_path,
+
+        ctx.eval_case = 'by owner'
+        test_cases = (TestCase.OWNER,)
+        results[ctx.eval_case] = mpm.test_cases.execute_tests(
+            test_cases, copy(ctx)
         )
-        eval_case = 'by owner directory'
-        results[eval_case] = mpm.test_cases.generalize_by_owner_directory.test(
-            trees[0],
-            case,
-            eval_case,
-            subject_contexts,
-            object_types,
-            domain_transitions[0].values(),
-            db,
-            fhs_path,
-            [db.get_uid_from_name(name) for name in uid_names],
-            [db.get_gid_from_name(name) for name in gid_names],
+
+        ctx.eval_case = 'by owner directory'
+        test_cases = (TestCase.OWNER_DIRECTORY,)
+        results[ctx.eval_case] = mpm.test_cases.execute_tests(
+            test_cases, copy(ctx)
         )
-        eval_case = 'nonexistent'
-        results[eval_case] = mpm.test_cases.generalize_nonexistent.test(
-            trees[0],
-            case,
-            eval_case,
-            subject_contexts,
-            object_types,
-            domain_transitions[0].values(),
-            db,
-            fhs_path,
+
+        ctx.eval_case = 'nonexistent'
+        test_cases = (TestCase.NONEXISTENT,)
+        results[ctx.eval_case] = mpm.test_cases.execute_tests(
+            test_cases, copy(ctx)
         )
-        eval_case = 'multiple'
-        results[eval_case] = mpm.test_cases.generalize_multiple_runs.test(
-            trees,
-            case,
-            eval_case,
-            subject_contexts,
-            object_types,
-            domain_transitions[0].values(),
-            db,
-            fhs_path,
+
+        ctx.eval_case = 'multiple'
+        test_cases = (TestCase.MULTIPLE_RUNS,)
+        results[ctx.eval_case] = mpm.test_cases.execute_tests(
+            test_cases, copy(ctx)
         )
 
     db.close()
