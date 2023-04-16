@@ -157,6 +157,18 @@ def main():
             test_cases, copy(ctx)
         )
 
+        ctx.eval_case = 'multiple+generalize'
+        test_cases = (TestCase.MULTIPLE_RUNS, TestCase.STANDARD)
+        results[ctx.eval_case] = mpm.test_cases.execute_tests(
+            test_cases, copy(ctx)
+        )
+
+        ctx.eval_case = 'nonexistent+generalize'
+        test_cases = (TestCase.NONEXISTENT, TestCase.STANDARD)
+        results[ctx.eval_case] = mpm.test_cases.execute_tests(
+            test_cases, copy(ctx)
+        )
+
     db.close()
 
     summary_buf = io.StringIO()
