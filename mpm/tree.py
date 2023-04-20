@@ -54,7 +54,13 @@ class Access:
 
     def __repr__(self):
         # This is a shortened version, for the full version see `full_repr`
-        return f'<{str(hash(self.domain))[:2]} {self.domain[-1][0]}({self.domain[-1][1]}): {self.permissions}>'
+        try:
+            repr = f'<{str(hash(self.domain))[:2]} {self.domain[-1][0]}({self.domain[-1][1]}): {self.permissions}>'
+        except IndexError:
+            repr = (
+                f'<{str(hash(self.domain))[:2]} NO DOMAIN: {self.permissions}>'
+            )
+        return repr
 
     def full_repr(self) -> str:
         return f'<{self.domain} ({self.uid}): {self.permissions}>'
