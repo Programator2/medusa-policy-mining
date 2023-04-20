@@ -200,19 +200,25 @@ def assign_permissions(
                     # different principal, and thus a different rules may
                     # apply). We consider changes to euid as domain transfers.
                     old_domain = domain[m['pid']]
-                    domain[m['pid']] += (
-                        (
-                            domain[m['pid']][-1][0],
-                            int(m['euid']),
-                        ),
+                    new_domain_leaf = (
+                        # Leave previous executable path
+                        old_domain[-1][0],
+                        # Use the new euid
+                        int(m['euid']),
                     )
+                    # Construct the new domain
+                    new_domain = old_domain[:-1] + (new_domain_leaf,)
+
+                    # Paranoid check
+                    assert isinstance(new_domain[-1], tuple)
+                    domain[m['pid']] = new_domain
                     domain_transition[
                         (
                             old_domain,
                             'setresuid',
                             int(m['euid']),
                         )
-                    ] = domain[m['pid']]
+                    ] = new_domain
 
             # Determine domain:
             initialize_exec_history(m, messages, exec_histories)
