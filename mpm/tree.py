@@ -412,7 +412,7 @@ class NpmTree(GenericTree):
             # the type (directory/file)
             if number / total_count >= GENERALIZE_THRESHOLD:
                 # This means that all child items have the same accesses
-                if node.data == None:
+                if node.data is None:
                     node.data = NpmNode()
                 NpmNode.generic_add_access(node.data.generalized, ac := access)
                 if verbose:

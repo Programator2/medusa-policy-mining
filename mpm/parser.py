@@ -11,7 +11,9 @@ from mpm.mpm_types import PathAccess, AuditLogRaw, AuditEntry
 from typing import DefaultDict, TypeVar, Any, Iterable, Mapping
 
 
-def search_field(l: Iterable[Mapping], key: str, _type: str = None) -> str | None:
+def search_field(
+    l: Iterable[Mapping], key: str, _type: str = None
+) -> str | None:
     """Given a list of dictionaries `l`, search for a given `key`. The first
     matching value is returned.
 
