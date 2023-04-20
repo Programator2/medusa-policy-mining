@@ -20,9 +20,35 @@ SSHD = (
 )
 
 
+POSTFIX = (
+    'postfix_bounce_exec_t',
+    'postfix_cleanup_exec_t',
+    'postfix_data_t',
+    'postfix_etc_t',
+    'postfix_exec_t',
+    'postfix_local_exec_t',
+    'postfix_map_exec_t',
+    'postfix_master_exec_t',
+    'postfix_pickup_exec_t',
+    'postfix_pipe_exec_t',
+    'postfix_postdrop_exec_t',
+    'postfix_postqueue_exec_t',
+    'postfix_private_t',
+    'postfix_public_t',
+    'postfix_qmgr_exec_t',
+    'postfix_showq_exec_t',
+    'postfix_smtp_exec_t',
+    'postfix_smtpd_exec_t',
+    'postfix_spool_bounce_t',
+    'postfix_spool_t',
+    'postfix_virtual_exec_t'
+)
+
+
 def get_object_types_by_name(name: str) -> tuple[str, ...]:
     """Get a tuple of object contexts for the given service."""
     return {
         'postgres': POSTGRESQL,
         'sshd': SSHD,
+        'postfix': POSTFIX,
     }[name]
