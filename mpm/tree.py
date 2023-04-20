@@ -402,6 +402,8 @@ class NpmTree(GenericTree):
             for access in access_set:
                 # access is `Access`
                 for permission in access.permissions:
+                    # Unfold associated permissions to individual permissions +
+                    # `Access`. `Access` contains the requested domain.
                     new_access = copy(access)
                     new_access.permissions = permission
                     c[new_access] += 1
