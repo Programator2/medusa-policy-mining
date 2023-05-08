@@ -1,17 +1,27 @@
 /dev/block	R
 /dev/bsg	R
+/dev/bus	R
 /dev/char	R
+/dev/cpu	R
 /dev/disk	R
+/dev/dma_heap	R
 /dev/dri	R
 /dev/fedora	R
 /dev/input	R
 /dev/mapper	R
 /dev/mqueue	RW
 /dev/pts	R
+/dev/snd	R
+/dev/vfio	R
+/dev/net	R
 /etc/authselect/.*	R	reg
 /etc/pki/tls/.*	R	reg
+/etc/authselect	R
+/etc/ssh/ssh_config.d	R
+/etc/ssh/sshd_config.d	R
+
 /run/credentials	RW
-/run/cryptosetup	RW
+/run/cryptsetup	RW
 /run/faillock	W
 /run/initramfs	RW
 /run/lock	RW
@@ -19,6 +29,7 @@
 /run/ostree	RW
 /run/systemd/resolve/resolv.conf	R
 /run/tpm2-tss	RW
+/run/tmpfiles.d	RW
 /run/udev	R
 /run/utmp	R
 /usr/bin/.*	R	reg
@@ -70,93 +81,8 @@
 /proc/softirqs	R
 /proc/stat	R
 /proc/swaps	R
-/proc/sys/kernel/acct	R
-/proc/sys/kernel/arch	R
-/proc/sys/kernel/auto_msgmni	R
-/proc/sys/kernel/bootloader_type	R
-/proc/sys/kernel/bootloader_version	R
-/proc/sys/kernel/cad_pid	R
-/proc/sys/kernel/core_pattern	R
-/proc/sys/kernel/core_pipe_limit	R
-/proc/sys/kernel/core_uses_pid	R
-/proc/sys/kernel/ctrl-alt-del	R
-/proc/sys/kernel/domainname	R
-/proc/sys/kernel/ftrace_dump_on_oops	R
-/proc/sys/kernel/hardlockup_all_cpu_backtrace	R
-/proc/sys/kernel/hardlockup_panic	R
-/proc/sys/kernel/hostname	R
-/proc/sys/kernel/io_delay_type	R
-/proc/sys/kernel/keys	R
-/proc/sys/kernel/max_lock_depth	R
-/proc/sys/kernel/max_rcu_stall_to_panic	R
-/proc/sys/kernel/modprobe	R
-/proc/sys/kernel/msgmax	R
-/proc/sys/kernel/msgmnb	R
-/proc/sys/kernel/msgmni	R
-/proc/sys/kernel/ngroups_max	R
-/proc/sys/kernel/nmi_watchdog	R
-/proc/sys/kernel/oops_all_cpu_backtrace	R
-/proc/sys/kernel/oops_limit	R
-/proc/sys/kernel/osrelease	R
-/proc/sys/kernel/ostype	R
-/proc/sys/kernel/overflowgid	R
-/proc/sys/kernel/overflowuid	R
-/proc/sys/kernel/panic_on_io_nmi	R
-/proc/sys/kernel/panic_on_oops	R
-/proc/sys/kernel/panic_on_rcu_stall	R
-/proc/sys/kernel/panic_on_unrecovered_nmi	R
-/proc/sys/kernel/panic_on_warn	R
-/proc/sys/kernel/panic_print	R
-/proc/sys/kernel/panic	R
-/proc/sys/kernel/perf_cpu_time_max_percent	R
-/proc/sys/kernel/perf_event_max_contexts_per_stack	R
-/proc/sys/kernel/perf_event_max_sample_rate	R
-/proc/sys/kernel/perf_event_max_stack	R
-/proc/sys/kernel/perf_event_mlock_kb	R
-/proc/sys/kernel/perf_event_paranoid	R
-/proc/sys/kernel/pid_max	R
-/proc/sys/kernel/poweroff_cmd	R
-/proc/sys/kernel/print-fatal-signals	R
-/proc/sys/kernel/printk_delay	R
-/proc/sys/kernel/printk_devkmsg	R
-/proc/sys/kernel/printk_ratelimit_burst	R
-/proc/sys/kernel/printk_ratelimit	R
-/proc/sys/kernel/printk	R
-/proc/sys/kernel/pty	R
-/proc/sys/kernel/random	R
-/proc/sys/kernel/real-root-dev	R
-/proc/sys/kernel/sched_autogroup_enabled	R
-/proc/sys/kernel/sched_child_runs_first	R
-/proc/sys/kernel/sched_deadline_period_max_us	R
-/proc/sys/kernel/sched_deadline_period_min_us	R
-/proc/sys/kernel/sched_rr_timeslice_ms	R
-/proc/sys/kernel/sched_rt_period_us	R
-/proc/sys/kernel/sched_rt_runtime_us	R
-/proc/sys/kernel/seccomp	R
-/proc/sys/kernel/sem	R
-/proc/sys/kernel/shmall	R
-/proc/sys/kernel/shmmax	R
-/proc/sys/kernel/shmmni	R
-/proc/sys/kernel/shm_rmid_forced	R
-/proc/sys/kernel/softlockup_all_cpu_backtrace	R
-/proc/sys/kernel/softlockup_panic	R
-/proc/sys/kernel/soft_watchdog	R
-/proc/sys/kernel/split_lock_mitigate	R
-/proc/sys/kernel/sysctl_writes_strict	R
-/proc/sys/kernel/sysrq	R
-/proc/sys/kernel/tainted	R
-/proc/sys/kernel/task_delayacct	R
-/proc/sys/kernel/threads-max	R
-/proc/sys/kernel/timer_migration	R
-/proc/sys/kernel/traceoff_on_warning	R
-/proc/sys/kernel/tracepoint_printk	R
-/proc/sys/kernel/unknown_nmi_panic	R
-/proc/sys/kernel/usermodehelper	R
-/proc/sys/kernel/version	R
-/proc/sys/kernel/warn_limit	R
-/proc/sys/kernel/watchdog_cpumask	R
-/proc/sys/kernel/watchdog	R
-/proc/sys/kernel/watchdog_thresh	R
+/proc/sys/kernel/.*	R	reg
+/proc/sys/kernel/cad_pid
 /proc/sys	R
 /proc/sys/debug	R
 /proc/sys/dev	R
@@ -231,21 +157,13 @@
 /run/multipath	R
 /run/utmp	W
 
-/tmp/\.X.+?-lock	W	reg
+/tmp/\.X.+?-lock	RW	reg
+/tmp/systemd-private-.*	RW	reg
 
 /etc/authselect	W
 /etc/ssh/ssh_config.d	W
 /etc/ssh/sshd_config.d	W
 /usr/share/crypto-policies	W
-/usr/share/crypto-policies/DEFAULT	W
-/usr/share/crypto-policies/EMPTY	W
-/usr/share/crypto-policies/FEDORA38	W
-/usr/share/crypto-policies/FIPS	W
-/usr/share/crypto-policies/FUTURE	W
-/usr/share/crypto-policies/LEGACY	W
-/usr/share/crypto-policies/TEST-FEDORA39	W
-/usr/share/crypto-policies/back-ends	W
-/usr/share/crypto-policies/policies	W
-/usr/share/crypto-policies/python	W
+/usr/share/crypto-policies/.*	RW	reg
 
 /usr/lib/.build-id	rR
