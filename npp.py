@@ -96,7 +96,7 @@ def main():
 
     db = DatabaseWriter('fs.db')
 
-    results: dict[Result] = {}
+    results: dict[str, Result] = {}
 
     mpm.test_cases.helpers.prepare_selinux_accesses(
         db, case, subject_contexts, object_types
@@ -127,48 +127,87 @@ def main():
             test_cases, copy(ctx)
         )
 
-        ctx.eval_case = 'standard generalization'
+        ctx.eval_case = 'T'
         test_cases = (TestCase.STANDARD,)
         results[ctx.eval_case] = mpm.test_cases.execute_tests(
             test_cases, copy(ctx)
         )
 
-        ctx.eval_case = 'by owner'
+        ctx.eval_case = 'O'
         test_cases = (TestCase.OWNER,)
         results[ctx.eval_case] = mpm.test_cases.execute_tests(
             test_cases, copy(ctx)
         )
 
-        ctx.eval_case = 'by owner directory'
+        ctx.eval_case = 'OD'
         test_cases = (TestCase.OWNER_DIRECTORY,)
         results[ctx.eval_case] = mpm.test_cases.execute_tests(
             test_cases, copy(ctx)
         )
 
-        ctx.eval_case = 'nonexistent'
+        ctx.eval_case = 'N'
         test_cases = (TestCase.NONEXISTENT,)
         results[ctx.eval_case] = mpm.test_cases.execute_tests(
             test_cases, copy(ctx)
         )
 
-        ctx.eval_case = 'multiple'
+        ctx.eval_case = 'M'
         test_cases = (TestCase.MULTIPLE_RUNS,)
         results[ctx.eval_case] = mpm.test_cases.execute_tests(
             test_cases, copy(ctx)
         )
 
-        ctx.eval_case = 'multiple+generalize'
+        # pairs
+        ctx.eval_case = 'M+T'
         test_cases = (TestCase.MULTIPLE_RUNS, TestCase.STANDARD)
         results[ctx.eval_case] = mpm.test_cases.execute_tests(
             test_cases, copy(ctx)
         )
-
-        ctx.eval_case = 'nonexistent+generalize'
+        ctx.eval_case = 'N+T'
         test_cases = (TestCase.NONEXISTENT, TestCase.STANDARD)
         results[ctx.eval_case] = mpm.test_cases.execute_tests(
             test_cases, copy(ctx)
         )
-
+        ctx.eval_case = 'O+T'
+        test_cases = (TestCase.OWNER, TestCase.STANDARD)
+        results[ctx.eval_case] = mpm.test_cases.execute_tests(
+            test_cases, copy(ctx)
+        )
+        ctx.eval_case = 'OD+T'
+        test_cases = (TestCase.OWNER_DIRECTORY, TestCase.STANDARD)
+        results[ctx.eval_case] = mpm.test_cases.execute_tests(
+            test_cases, copy(ctx)
+        )
+        ctx.eval_case = 'OD+O'
+        test_cases = (TestCase.OWNER_DIRECTORY, TestCase.OWNER)
+        results[ctx.eval_case] = mpm.test_cases.execute_tests(
+            test_cases, copy(ctx)
+        )
+        ctx.eval_case = 'O+N'
+        test_cases = (TestCase.OWNER, TestCase.NONEXISTENT)
+        results[ctx.eval_case] = mpm.test_cases.execute_tests(
+            test_cases, copy(ctx)
+        )
+        ctx.eval_case = 'O+M'
+        test_cases = (TestCase.OWNER, TestCase.MULTIPLE_RUNS)
+        results[ctx.eval_case] = mpm.test_cases.execute_tests(
+            test_cases, copy(ctx)
+        )
+        ctx.eval_case = 'OD+N'
+        test_cases = (TestCase.OWNER_DIRECTORY, TestCase.NONEXISTENT)
+        results[ctx.eval_case] = mpm.test_cases.execute_tests(
+            test_cases, copy(ctx)
+        )
+        ctx.eval_case = 'OD+M'
+        test_cases = (TestCase.OWNER_DIRECTORY, TestCase.MULTIPLE_RUNS)
+        results[ctx.eval_case] = mpm.test_cases.execute_tests(
+            test_cases, copy(ctx)
+        )
+        ctx.eval_case = 'N+M'
+        test_cases = (TestCase.NONEXISTENT, TestCase.MULTIPLE_RUNS)
+        results[ctx.eval_case] = mpm.test_cases.execute_tests(
+            test_cases, copy(ctx)
+        )
     db.close()
 
     summary_buf = io.StringIO()
@@ -184,6 +223,23 @@ def main():
     result_dir = Path(f'results/{case}')
     with open(result_dir / 'summary.txt', 'w') as f:
         f.write(summary_str)
+
+    with open(result_dir / 'summary.csv', 'w') as f:
+        f.write(result.summary_csv_header())
+        for name, result in results.items():
+            f.write(result.summary_csv_line(name))
+
+    with open(result_dir / 'short_summary.tex', 'w') as f:
+        f.write(result.summary_tabular_short_header())
+        for name, result in results.items():
+            f.write(result.summary_tabular_short_line(name))
+        f.write(result.summary_tabular_footer())
+
+    with open(result_dir / 'full_summary.tex', 'w') as f:
+        f.write(result.summary_csv_header())
+        for name, result in results.items():
+            f.write(result.summary_tabular_full_line(name))
+        f.write(result.summary_tabular_footer())
 
     summary_buf.close()
 
