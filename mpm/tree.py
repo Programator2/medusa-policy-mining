@@ -603,11 +603,19 @@ class NpmTree(GenericTree):
             if not generalized:
                 continue
 
-            new_data_node = NpmNode(generalized)
-            new_data_node.is_regexp = True
+            # Search if it doesn't exist already
+            children = self.search_children_by_tag(node, '.*')
+            assert len(children) <= 1
 
-            new_node = self.create_node('.*', parent=node.identifier)
-            new_node.data = new_data_node
+            if not children:
+                new_data_node = NpmNode(generalized)
+                new_data_node.is_regexp = True
+
+                new_node = self.create_node('.*', parent=node.identifier)
+                new_node.data = new_data_node
+            else:
+                new_node = children[0]
+                new_node.data.merge(generalized)
 
             node.data.generalized.clear()
 
