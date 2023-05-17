@@ -4,6 +4,7 @@ from pathlib import PurePosixPath
 from fs2json.db import DatabaseRead
 from mpm.config import GENERALIZE_PROC
 from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from mpm.tree import NpmTree
 from collections.abc import Iterable
@@ -44,7 +45,9 @@ def generalize_nonexistent(path: str, db: DatabaseRead):
 
 
 def generalize_from_fhs_rules(
-    rules_path: str, tree: NpmTree, medusa_domains: Iterable[tuple[tuple]]
+    rules_path: str,
+    tree: NpmTree,
+    medusa_domain_groups: Iterable[Iterable[tuple[tuple]]],
 ) -> None:
     """Generalize using rules from a file.
 
@@ -69,8 +72,9 @@ def generalize_from_fhs_rules(
     created rules.
     """
     access_info = []
-    for d in medusa_domains:
-        access_info.append((d[-1][1], d))
+    for medusa_domains in medusa_domain_groups:
+        for d in medusa_domains:
+            access_info.append((d[-1][1], d))
 
     with open(rules_path) as f:
         rules = tree.load_fhs_config(f)

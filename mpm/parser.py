@@ -175,7 +175,7 @@ def assign_permissions(
                     )
 
                     # A new domain has been created, add it to the tree
-                    exec_history_tree._create_path(exec_histories[m['pid']])
+                    # exec_history_tree._create_path(exec_histories[m['pid']])
 
                     domain_transition[
                         (
@@ -380,6 +380,6 @@ def parse_log(
     domain transfer tree
     """
     serials = parse(path)
-    out = assign_permissions(serials, domain_tree, domain_transition)
+    out = assign_permissions(serials, None, domain_transition)
     out = create_log_entries(out)
     return out

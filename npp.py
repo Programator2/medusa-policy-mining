@@ -18,6 +18,7 @@ from pathlib import Path
 from mpm.test_cases.helpers import TestCaseContext
 from mpm.test_cases import TestCase
 from copy import copy
+from itertools import chain
 
 
 def usage():
@@ -55,22 +56,36 @@ def main():
         print(e, file=sys.stderr)
         return usage()
 
-    uid_names: list[str] = []
-    gid_names: list[str] = []
+    uid_name_groups: list[list[str]] = []
+    gid_name_groups: list[list[str]] = []
 
-    subject_contexts: tuple[str, ...] = None
-    object_types: tuple[str, ...] = None
+    subject_context_groups: list[list[str, ...]] = []
+    object_type_groups: list[list[str, ...]] = []
 
     for opt, value in optlist:
         match opt:
             case '--user':
-                uid_names.append(value)
+                uid_name_groups.append(value.split(','))
             case '--group':
-                gid_names.append(value)
+                gid_name_groups.append(value.split(','))
             case '--object':
-                object_types = get_object_types_by_name(value)
+                object_type_groups.append(
+                    list(
+                        chain.from_iterable(
+                            get_object_types_by_name(v)
+                            for v in value.split(',')
+                        )
+                    )
+                )
             case '--subject':
-                subject_contexts = get_subject_context_by_name(value)
+                subject_context_groups.append(
+                    list(
+                        chain.from_iterable(
+                            get_subject_context_by_name(v)
+                            for v in value.split(',')
+                        )
+                    )
+                )
             case '--help':
                 return usage()
             case _:
@@ -78,20 +93,37 @@ def main():
 
     case = args[0]
     args = args[1:]
+    # runs contains individual services: [[service1 log1, service1 log2],
+    # [service2 log1, service2 log2]]
     runs = list(split_at(args, lambda x: x == '--'))
     max_runs = max(len(run) for run in runs)
+    # One tree for each "run", but multiple services
     trees: list[NpmTree] = []
-    domain_trees: list[DomainTree] = []
-    domain_transitions: list[dict[tuple[tuple, str, Any], tuple]] = []
+    # domain_trees: list[DomainTree] = []
+    # `domain_transition_groups`: [[{s1 run1}, {s1 run2}], [{s2 run1}, {s2 run2}]]
+    domain_transition_groups: list[
+        list[dict[tuple[tuple, str, Any], tuple]]
+    ] = []
 
+    # Create one tree for each run. A tree can contain multiple services.
     for i in range(max_runs):
         trees.append(NpmTree())
-        domain_trees.append(DomainTree())
-        domain_transitions.append({})
 
-    for logs in runs:
+    # Create dicts for domain transitions. Each service gets private domain
+    # transition sets for each run.
+    for _ in runs:
+        l = []
+        domain_transition_groups.append(l)
+        for i in range(max_runs):
+            # domain_trees.append(DomainTree())
+            l.append({})
+
+    for j, logs in enumerate(runs):
+        # `logs` are log files from one service
         for i, log_path in enumerate(logs):
-            log = parse_log(log_path, domain_trees[i], domain_transitions[i])
+            # TODO: Remove second argument altogether
+            # These are different runs for *one* service
+            log = parse_log(log_path, None, domain_transition_groups[j][i])
             trees[i].load_log(log)
 
     db = DatabaseWriter('fs.db')
@@ -99,7 +131,7 @@ def main():
     results: dict[str, Result] = {}
 
     mpm.test_cases.helpers.prepare_selinux_accesses(
-        db, case, subject_contexts, object_types
+        db, case, subject_context_groups, object_type_groups
     )
 
     fhs_path = 'fhs_rules.txt'
@@ -108,15 +140,24 @@ def main():
         trees[0],
         case,
         '',
-        subject_contexts,
-        object_types,
-        domain_transitions[0].values(),
+        subject_context_groups,
+        object_type_groups,
+        [
+            domain_transitions[0].values()
+            for domain_transitions in domain_transition_groups
+        ],
         db,
         fhs_path,
     )
     ctx.trees = trees
-    ctx.uids = [db.get_uid_from_name(name) for name in uid_names]
-    ctx.gids = [db.get_gid_from_name(name) for name in gid_names]
+    ctx.uids = [
+        [db.get_uid_from_name(name) for name in uid_names]
+        for uid_names in uid_name_groups
+    ]
+    ctx.gids = [
+        [db.get_gid_from_name(name) for name in gid_names]
+        for gid_names in gid_name_groups
+    ]
 
     # Double pass because reference items may be added to the database through
     # generalization
