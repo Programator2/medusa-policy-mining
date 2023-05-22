@@ -31,8 +31,7 @@ class TestNumericRegexp(unittest.TestCase):
 
     def test3(self):
         self.assertEqual(
-            runs._get_numeric_regexp('a1b2c'),
-            r'a\d*b\d*c'
+            runs._get_numeric_regexp('hello world'), 'hello\ world'
         )
 
     def test4(self):
