@@ -12,6 +12,8 @@ from re import escape, fullmatch
 from collections import Counter
 from copy import deepcopy, copy
 from mpm.config import MULTIPLE_RUNS_STRATEGY, MultipleRunsSingleton
+import sys
+from mpm.generalize.lcs import prefix_postfix_regexp
 
 
 def regex_from_diff(diff: Iterable[tuple[int, str]]) -> str:
@@ -184,6 +186,7 @@ def generalize_mupltiple_runs(db: DatabaseRead, *trees: NpmTree) -> NpmTree:
                         )
                 continue
             control, *others = all_paths
+            # TOOD: make `regexps` a set
             regexps = []
             # print(f'{control.path=}')
             for row in others:
@@ -204,9 +207,16 @@ def generalize_mupltiple_runs(db: DatabaseRead, *trees: NpmTree) -> NpmTree:
                     if all(fullmatch(reg, row.path) for row in others):
                         break
                 else:
-                    raise RuntimeError(
-                        "Regexp that covers all paths doesn't exist."
+                    print(
+                        "Regexp that covers all paths doesn't exist. Using alternative regexp generator.",
+                        file=sys.stderr,
                     )
+                    reg = prefix_postfix_regexp([row.path for row in all_paths])
+                    # This is just sanity check, but who knows.
+                    if not all(fullmatch(reg, row.path) for row in all_paths):
+                        raise RuntimeError(
+                            "Regexp that covers all paths doesn't exist."
+                        )
             else:
                 try:
                     reg = regexps[0]

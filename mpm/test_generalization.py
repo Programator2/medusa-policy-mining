@@ -1,5 +1,5 @@
 import unittest
-from mpm.generalize import generalize, runs
+from mpm.generalize import generalize, runs, lcs
 
 
 class TestProcGeneralization(unittest.TestCase):
@@ -28,14 +28,35 @@ class TestNumericRegexp(unittest.TestCase):
         )
 
     def test3(self):
+        self.assertEqual(runs._get_numeric_regexp('a1b2c'), r'a\d*b\d*c')
+
+    def test4(self):
         self.assertEqual(
             runs._get_numeric_regexp('hello world'), 'hello\ world'
         )
 
-    def test4(self):
+
+class TestPrefixPostfixRegexp(unittest.TestCase):
+    def test_both(self):
+        inp = [
+            '/usr/sbin/postconfx',
+            '/usr/sbin/semndmail.postfix',
+            '/usr/sbin/postsuperx',
+            '/usr/sbin/postlogx',
+        ]
         self.assertEqual(
-            runs._get_numeric_regexp('hello world'),
-            'hello world'
+            lcs.prefix_postfix_regexp(inp), r'/usr/sbin/.*?post.*?x'
+        )
+
+    def test_just_prefix(self):
+        inp = [
+            '/usr/sbin/postconf',
+            '/usr/sbin/semndmail.postfix',
+            '/usr/sbin/postsuper',
+            '/usr/sbin/postlog',
+        ]
+        self.assertEqual(
+            lcs.prefix_postfix_regexp(inp), r'/usr/sbin/.*?post.*?'
         )
 
 
