@@ -1,0 +1,11 @@
+* Medusa Policy Mining
+This module allows you to create policies from audit logs for the Constable
+authorization server.
+
+** Example usage
+For example, if you want to create policy for PostgreSQL and the logs are stored
+in ~*postfix.log~ files, call:
+: npp.py --user=postgres --object=postgres --subject=postgres postgres-2023-05-11 *postfix.log
+
+Log files from different services have to be separeted using ~--~:
+: npp.py 2023-05-11 postfix.log -- sshd.log
