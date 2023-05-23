@@ -44,6 +44,21 @@ POSTFIX = (
     'postfix_virtual_exec_t'
 )
 
+APACHE = (
+    'httpd_cache_t',
+    'httpd_config_t',
+    'httpd_exec_t',
+    'httpd_log',
+    'httpd_modules_t',
+    'httpd_rotatelogs_exec',
+    'httpd_suexec_exec_t',
+    'httpd_sys_content_',
+    'httpd_sys_script_exec_t',
+    'httpd_unit_file_t',
+    'httpd_var_lib_t',
+    'httpd_var_run_t',
+)
+
 
 def get_object_types_by_name(name: str) -> tuple[str, ...]:
     """Get a tuple of object contexts for the given service."""
@@ -51,4 +66,5 @@ def get_object_types_by_name(name: str) -> tuple[str, ...]:
         'postgres': POSTGRESQL,
         'sshd': SSHD,
         'postfix': POSTFIX,
+        'apache': APACHE,
     }[name]

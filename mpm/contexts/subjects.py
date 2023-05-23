@@ -7,6 +7,7 @@ POSTFIX = (
     'system_u:system_r:postfix_pickup_t:s0',
     'system_u:system_r:postfix_qmgr_t:s0',
 )
+APACHE = ('system_u:system_r:httpd_t:s0',)
 
 
 def get_subject_context_by_name(name: str) -> tuple[str, ...]:
@@ -15,4 +16,5 @@ def get_subject_context_by_name(name: str) -> tuple[str, ...]:
         'postgres': POSTGRESQL,
         'sshd': SSHD,
         'postfix': POSTFIX,
+        'apache': APACHE,
     }[name]
