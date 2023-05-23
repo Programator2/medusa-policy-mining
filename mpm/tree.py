@@ -1013,7 +1013,7 @@ WHERE rowid = 1
                 parent = exists
             else:
                 if verbose:
-                    print(f'Path {path} does not exist.', file=sys.stderr)
+                    print(f'Path {path} is not in the tree.', file=sys.stderr)
                 return None
         return parent
 
