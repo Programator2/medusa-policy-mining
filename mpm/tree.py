@@ -572,6 +572,8 @@ class NpmTree(GenericTree):
         Database `db` will be searched for directories that match `uids` OR
         `gids`. Directories that match will have `.*` rule inserted under them.
         """
+        if verbose:
+            print(f'{uids=} {gids=}')
         dirs = db.get_directories_by_id(uids, gids)
         for (path, mode) in dirs:
             if verbose:
