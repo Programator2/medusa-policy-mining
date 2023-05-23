@@ -91,6 +91,19 @@ def main():
             case _:
                 return usage()
 
+    # Clean up gids
+    # This is a hack and it should be handled better.
+    # But there's no time, so I'm doing it like this.
+    #
+    # Basically, the number of items in these lists has to be the same, because
+    # later I'm zipping theme together.
+    if len(uid_name_groups) > len(gid_name_groups):
+        for i in range(len(uid_name_groups) - len(gid_name_groups)):
+            gid_name_groups.append([])
+    if len(gid_name_groups) > len(uid_name_groups):
+        for i in range(len(gid_name_groups) - len(uid_name_groups)):
+            uid_name_groups.append([])
+
     case = args[0]
     args = args[1:]
     # runs contains individual services: [[service1 log1, service1 log2],
