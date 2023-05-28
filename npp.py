@@ -242,8 +242,8 @@ def main():
         results[ctx.eval_case] = mpm.test_cases.execute_tests(
             test_cases, copy(ctx)
         )
-        ctx.eval_case = 'O+M'
-        test_cases = (TestCase.OWNER, TestCase.MULTIPLE_RUNS)
+        ctx.eval_case = 'M+O'
+        test_cases = (TestCase.MULTIPLE_RUNS, TestCase.OWNER)
         results[ctx.eval_case] = mpm.test_cases.execute_tests(
             test_cases, copy(ctx)
         )
@@ -252,13 +252,13 @@ def main():
         results[ctx.eval_case] = mpm.test_cases.execute_tests(
             test_cases, copy(ctx)
         )
-        ctx.eval_case = 'OD+M'
-        test_cases = (TestCase.OWNER_DIRECTORY, TestCase.MULTIPLE_RUNS)
+        ctx.eval_case = 'M+OD'
+        test_cases = (TestCase.MULTIPLE_RUNS, TestCase.OWNER_DIRECTORY)
         results[ctx.eval_case] = mpm.test_cases.execute_tests(
             test_cases, copy(ctx)
         )
-        ctx.eval_case = 'N+M'
-        test_cases = (TestCase.NONEXISTENT, TestCase.MULTIPLE_RUNS)
+        ctx.eval_case = 'M+N'
+        test_cases = (TestCase.MULTIPLE_RUNS, TestCase.NONEXISTENT)
         results[ctx.eval_case] = mpm.test_cases.execute_tests(
             test_cases, copy(ctx)
         )
