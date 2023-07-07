@@ -185,6 +185,8 @@ def generalize_mupltiple_runs(db: DatabaseRead, *trees: NpmTree) -> NpmTree:
                             all_paths, paths, regex_tree, reg, True
                         )
                 continue
+            # TODO: mY recommends to construct diff for all pairs, not just
+            # `control` with paths from `others`.
             control, *others = all_paths
             # TOOD: make `regexps` a set
             regexps = []
